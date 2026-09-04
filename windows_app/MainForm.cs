@@ -44,6 +44,7 @@ public sealed class MainForm : Form
     private readonly ProgressBar _meter = new();
 
     private DateTime _lastSoundTime = DateTime.MinValue;
+    private bool _isAudioRunning = false;
 
     public MainForm()
     {
@@ -267,6 +268,11 @@ public sealed class MainForm : Form
         _chkMonitor.CheckedChanged += (_, _) => ToggleMonitoring();
         _testSpeaker.Click += (_, _) => RunMicrophoneSelfTest();
 
+        // 当用户修改配置（输出设备、试听设备、采样率）时，自动热重载音频引擎，无需重启软件
+        _outputDevice.SelectedIndexChanged += (_, _) => { if (_isAudioRunning) StartAudioEngine(); };
+        _monitorDevice.SelectedIndexChanged += (_, _) => { if (_chkMonitor.Checked) ToggleMonitoring(); };
+        _sampleRate.SelectedIndexChanged += (_, _) => { if (_isAudioRunning) StartAudioEngine(); };
+
         _udp.AudioLevel += UpdateMeter;
         _bluetooth.AudioLevel += UpdateMeter;
     }
@@ -451,6 +457,7 @@ public sealed class MainForm : Form
         try
         {
             _udp.Start(8091, rate, output.Index, monitorDev);
+            _isAudioRunning = true;
         }
         catch (Exception ex)
         {
@@ -460,9 +467,10 @@ public sealed class MainForm : Form
 
     private void StopAll()
     {
+        _isAudioRunning = false;
         _udp.Stop();
         _bluetooth.Stop();
-        SetPairStatus(false, "已断开连接");
+        SetPairStatus(false, "已断开音频串流 (配对服务保持待命，随时可重连)");
         UpdateMeter(-60, 0);
     }
 

@@ -22,10 +22,17 @@ class UdpTransport(private val serverIp: String, private val serverPort: Int = 8
     private var listener: TransportListener? = null
 
     override fun start() {
+        try {
+            socket?.close()
+        } catch (e: Exception) { }
+        socket = null
+
         Thread({
             try {
                 address = InetAddress.getByName(serverIp)
-                socket = DatagramSocket()
+                socket = DatagramSocket().apply {
+                    reuseAddress = true
+                }
                 connected = true
                 Log.i(TAG, "UDP 传输已就绪 -> $serverIp:$serverPort")
                 listener?.onConnected("Wi-Fi UDP: $serverIp:$serverPort")

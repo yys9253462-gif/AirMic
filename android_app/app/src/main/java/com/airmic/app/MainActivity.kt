@@ -114,6 +114,17 @@ class MainActivity : AppCompatActivity(), AudioCaptureService.ServiceCallback {
         spinnerSampleRate.adapter = adapter
         spinnerSampleRate.setSelection(2)
 
+        // 手机端修改配置时（如采样率更改），如果正在串流则自动无缝重启推流
+        spinnerSampleRate.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                if (isTransmitting) {
+                    stopStreaming()
+                    btnToggleMic.postDelayed({ startStreaming() }, 300)
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
         radioGroupTransport.setOnCheckedChangeListener { _, checkedId ->
             if (checkedId == R.id.radioWifi) {
                 if (isPairedSuccessfully) {
@@ -309,7 +320,8 @@ class MainActivity : AppCompatActivity(), AudioCaptureService.ServiceCallback {
         if (selectedTransport == "usb") {
             ip = "127.0.0.1"
         } else if (selectedTransport == "wifi" && !isPairedSuccessfully) {
-            Toast.makeText(this, "正在自动匹配电脑中，请稍候...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "正在重新匹配电脑中，请稍候...", Toast.LENGTH_SHORT).show()
+            startDualModePairingEngine()
             return
         }
 

@@ -96,7 +96,9 @@ class AudioCaptureService : Service(), TransportListener {
     }
 
     fun startCapture() {
-        if (isRecording) return
+        if (isRecording) {
+            stopCapture()
+        }
         startForeground(NOTIFICATION_ID, buildNotification("正在运行", "手机麦克风已就绪"))
         wakeLock?.acquire(10 * 60 * 1000L) // 保持 CPU 活跃
 
@@ -133,6 +135,7 @@ class AudioCaptureService : Service(), TransportListener {
 
             // 如果特定机型不支持 VOICE_COMMUNICATION，平滑回退到 MIC
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                audioRecord?.release()
                 audioRecord = AudioRecord(
                     MediaRecorder.AudioSource.MIC,
                     sampleRate,
@@ -140,6 +143,21 @@ class AudioCaptureService : Service(), TransportListener {
                     audioFormat,
                     bufferSize
                 )
+            }
+
+            // 快速重连容错：若硬件占用稍有延迟，重试最多 3 次
+            var retry = 0
+            while (audioRecord?.state != AudioRecord.STATE_INITIALIZED && retry < 3) {
+                Thread.sleep(80)
+                audioRecord?.release()
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                    sampleRate,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize
+                )
+                retry++
             }
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
@@ -222,6 +240,14 @@ class AudioCaptureService : Service(), TransportListener {
 
     fun stopCapture() {
         isRecording = false
+
+        // 先让采集线程优雅结束
+        try {
+            recordThread?.interrupt()
+            recordThread?.join(300)
+        } catch (e: Exception) { }
+        recordThread = null
+
         try {
             noiseSuppressor?.release()
             echoCanceler?.release()
@@ -238,7 +264,6 @@ class AudioCaptureService : Service(), TransportListener {
             Log.w(TAG, "释放 AudioRecord 异常", e)
         }
         audioRecord = null
-        recordThread = null
 
         transport?.stop()
         transport = null
@@ -247,7 +272,6 @@ class AudioCaptureService : Service(), TransportListener {
             wakeLock?.release()
         }
         stopForeground(true)
-        stopSelf()
         callback?.onStatusChanged("已停止录音")
     }
 
