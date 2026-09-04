@@ -3,6 +3,7 @@ using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -35,6 +36,7 @@ public sealed class MainForm : Form
     private readonly Button _disconnect = new();
     private readonly Button _testSpeaker = new();
 
+    private readonly Panel _pairCard = new();
     private readonly Label _pairStatusBadge = new();
     private readonly Label _pairDetail = new();
     private readonly Label _localAddress = new();
@@ -46,15 +48,27 @@ public sealed class MainForm : Form
     private DateTime _lastSoundTime = DateTime.MinValue;
     private bool _isAudioRunning = false;
 
+    // 现代配色规范
+    private static readonly Color BgColor = Color.FromArgb(248, 250, 252);        // #F8FAFC
+    private static readonly Color CardBg = Color.White;
+    private static readonly Color CardBorder = Color.FromArgb(226, 232, 240);    // #E2E8F0
+    private static readonly Color TextMain = Color.FromArgb(15, 23, 42);          // #0F172A
+    private static readonly Color TextSub = Color.FromArgb(71, 85, 105);          // #475569
+    private static readonly Color TextMuted = Color.FromArgb(148, 163, 184);      // #94A3B8
+    private static readonly Color AccentBlue = Color.FromArgb(37, 99, 235);       // #2563EB
+    private static readonly Color AccentGreen = Color.FromArgb(16, 185, 129);     // #10B981
+    private static readonly Color AccentYellow = Color.FromArgb(217, 119, 6);     // #D97706
+    private static readonly Color AccentRed = Color.FromArgb(239, 68, 68);        // #EF4444
+
     public MainForm()
     {
-        Text = "AirMic - 手机麦克风电脑接收端 (零配置自动配对版)";
-        Width = 780;
-        Height = 630;
-        MinimumSize = new Size(720, 580);
+        Text = "AirMic - 手机无线麦克风电脑端 (v1.0.0 Pro)";
+        Width = 840;
+        Height = 690;
+        MinimumSize = new Size(800, 650);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(248, 250, 252);
-        Font = new Font("Microsoft YaHei UI", 9F);
+        BackColor = BgColor;
+        Font = new Font("Microsoft YaHei UI", 9.5F);
 
         FormClosing += (_, _) => {
             _beaconTimer.Stop();
@@ -76,78 +90,107 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
+        // 顶部精美 Header 区域
+        var headerPanel = new Panel
+        {
+            Location = new Point(35, 18),
+            Size = new Size(750, 60),
+            BackColor = Color.Transparent
+        };
+        Controls.Add(headerPanel);
+
+        var iconLabel = new Label
+        {
+            Text = "🎙️",
+            Font = new Font("Segoe UI Emoji", 24F),
+            Location = new Point(0, 4),
+            AutoSize = true
+        };
+        headerPanel.Controls.Add(iconLabel);
+
         var title = new Label
         {
-            Text = "AirMic 手机无线麦克风接收端",
-            Font = new Font(Font.FontFamily, 18, FontStyle.Bold),
-            ForeColor = Color.FromArgb(15, 23, 42),
+            Text = "AirMic 手机无线麦克风系统",
+            Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
+            ForeColor = TextMain,
             AutoSize = true,
-            Location = new Point(30, 20)
+            Location = new Point(48, 2)
         };
         var subtitle = new Label
         {
-            Text = "零配置免输入！双端内置 UDP 广播 + 局域网主动扫描，即使路由器隔离广播也能秒级自动配对。",
-            ForeColor = Color.FromArgb(100, 116, 139),
+            Text = "零配置免输入 IP · 局域网全自动秒级配对 · 20ms 超低延迟 · 最高 192kHz 无损解析",
+            ForeColor = TextMuted,
+            Font = new Font("Microsoft YaHei UI", 9F),
             AutoSize = true,
-            Location = new Point(32, 56)
+            Location = new Point(50, 34)
         };
-        Controls.Add(title); Controls.Add(subtitle);
+        headerPanel.Controls.Add(title);
+        headerPanel.Controls.Add(subtitle);
 
         // 1. 配对状态大卡片
-        var pairCard = new Panel
-        {
-            Location = new Point(30, 90),
-            Size = new Size(700, 95),
-            BackColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-        Controls.Add(pairCard);
+        SetupCardPanel(_pairCard, 35, 85, 750, 95);
+        _pairCard.BackColor = Color.FromArgb(254, 252, 232); // 柔和琥珀黄预警底色
+        Controls.Add(_pairCard);
 
-        var pairTitle = new Label { Text = "配对状态：", AutoSize = true, Location = new Point(20, 18), ForeColor = Color.FromArgb(71, 85, 105), Font = new Font(Font.FontFamily, 10F, FontStyle.Bold) };
-        pairCard.Controls.Add(pairTitle);
+        var pairTitle = new Label 
+        { 
+            Text = "双端互通状态", 
+            AutoSize = true, 
+            Location = new Point(22, 16), 
+            ForeColor = TextSub, 
+            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold) 
+        };
+        _pairCard.Controls.Add(pairTitle);
 
         _pairStatusBadge.Text = "⏳ 等待手机配对中 (请在手机端打开 AirMic)";
         _pairStatusBadge.AutoSize = true;
-        _pairStatusBadge.Location = new Point(100, 16);
-        _pairStatusBadge.Font = new Font(Font.FontFamily, 11F, FontStyle.Bold);
-        _pairStatusBadge.ForeColor = Color.FromArgb(245, 158, 11);
-        pairCard.Controls.Add(_pairStatusBadge);
+        _pairStatusBadge.Location = new Point(125, 14);
+        _pairStatusBadge.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
+        _pairStatusBadge.ForeColor = AccentYellow;
+        _pairCard.Controls.Add(_pairStatusBadge);
 
-        _pairDetail.Text = "自动配对服务运行中... 无论路由器是否屏蔽广播，手机打开后均会自动探测到电脑。";
+        _pairDetail.Text = "自动配对服务运行中... 手机打开 App 后无需输入 IP，秒级自动探测连接。";
         _pairDetail.AutoSize = true;
-        _pairDetail.Location = new Point(22, 52);
-        _pairDetail.ForeColor = Color.FromArgb(100, 116, 139);
-        pairCard.Controls.Add(_pairDetail);
+        _pairDetail.Location = new Point(22, 50);
+        _pairDetail.Font = new Font("Microsoft YaHei UI", 9F);
+        _pairDetail.ForeColor = TextSub;
+        _pairCard.Controls.Add(_pairDetail);
 
-        // 2. 音频配置面板
-        var panel = new Panel
+        // 2. 音频配置卡片
+        var configPanel = new Panel();
+        SetupCardPanel(configPanel, 35, 195, 750, 185);
+        Controls.Add(configPanel);
+
+        var configHeader = new Label
         {
-            Location = new Point(30, 200),
-            Size = new Size(700, 175),
-            BackColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
+            Text = "⚙️ 核心音频与设备配置",
+            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
+            ForeColor = TextMain,
+            Location = new Point(22, 14),
+            AutoSize = true
         };
-        Controls.Add(panel);
+        configPanel.Controls.Add(configHeader);
 
-        int y = 16;
-        AddRow(panel, "连接方式", _mode, y);
+        int y = 48;
+        AddStyledRow(configPanel, "连接传输方式", _mode, y, 420);
         _mode.Items.AddRange(new object[] { "Wi-Fi 局域网 (默认推荐 / 零配置全自动配对)", "蓝牙 RFCOMM (SPP)" });
         _mode.SelectedIndex = 0;
-        y += 38;
+        y += 42;
 
-        AddRow(panel, "主音频输出", _outputDevice, y);
-        y += 38;
+        AddStyledRow(configPanel, "主音频输出设备", _outputDevice, y, 420);
+        y += 42;
 
-        AddRow(panel, "测试监听设备", _monitorDevice, y);
-        _chkMonitor.Text = "开启扬声器实时监听";
+        AddStyledRow(configPanel, "实时试听监听", _monitorDevice, y, 320);
+        _chkMonitor.Text = "启用耳机/扬声器耳返";
         _chkMonitor.AutoSize = true;
-        _chkMonitor.SetBounds(500, y + 4, 180, 24);
-        _chkMonitor.ForeColor = Color.FromArgb(37, 99, 235);
-        _chkMonitor.Font = new Font(Font.FontFamily, 8.5f, FontStyle.Bold);
-        panel.Controls.Add(_chkMonitor);
-        y += 38;
+        _chkMonitor.SetBounds(470, y + 4, 180, 26);
+        _chkMonitor.ForeColor = AccentBlue;
+        _chkMonitor.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+        _chkMonitor.Cursor = Cursors.Hand;
+        configPanel.Controls.Add(_chkMonitor);
+        y += 42;
 
-        AddRow(panel, "音频采样规格", _sampleRate, y);
+        AddStyledRow(configPanel, "音频采样规格", _sampleRate, y, 420);
         _sampleRate.Items.AddRange(new object[] { 
             "192000 Hz (192kHz 旗舰发烧级)", 
             "96000 Hz (96kHz 专业录音棚级)", 
@@ -157,79 +200,115 @@ public sealed class MainForm : Form
         });
         _sampleRate.SelectedIndex = 2;
 
-        // 3. 按钮操作栏
-        _connect.Text = "重置配对与接收";
-        _connect.SetBounds(30, 390, 150, 42);
-        _connect.BackColor = Color.FromArgb(37, 99, 235);
-        _connect.ForeColor = Color.White;
-        _connect.FlatStyle = FlatStyle.Flat;
-
-        _disconnect.Text = "断开连接";
-        _disconnect.SetBounds(190, 390, 100, 42);
-        _disconnect.FlatStyle = FlatStyle.Flat;
-
-        _testSpeaker.Text = "🔊 测试麦克风是否正常";
-        _testSpeaker.SetBounds(300, 390, 200, 42);
-        _testSpeaker.BackColor = Color.FromArgb(16, 185, 129);
-        _testSpeaker.ForeColor = Color.White;
-        _testSpeaker.FlatStyle = FlatStyle.Flat;
-        _testSpeaker.Font = new Font(Font.FontFamily, 9F, FontStyle.Bold);
+        // 3. 现代化操作按钮栏
+        StylePrimaryButton(_connect, "⚡ 重置配对与接收", 35, 395, 160, 42, AccentBlue);
+        StyleOutlineButton(_disconnect, "断开连接", 205, 395, 110, 42);
+        StylePrimaryButton(_testSpeaker, "🔊 麦克风自检回放 (测试)", 325, 395, 210, 42, AccentGreen);
 
         Controls.Add(_connect);
         Controls.Add(_disconnect);
         Controls.Add(_testSpeaker);
 
-        // 4. 实时电平与测试诊断卡片
-        var statPanel = new Panel
-        {
-            Location = new Point(30, 445),
-            Size = new Size(700, 125),
-            BackColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
-        };
+        // 4. 实时动态电平与诊断卡片
+        var statPanel = new Panel();
+        SetupCardPanel(statPanel, 35, 452, 750, 140);
         Controls.Add(statPanel);
 
-        _localAddress.Text = "电脑本机 Wi-Fi IP：" + GetRealWiFiIp() + " (UDP: 8091 / HTTP: 8090)";
-        _localAddress.SetBounds(20, 14, 650, 22);
-        _localAddress.ForeColor = Color.FromArgb(71, 85, 105);
+        _localAddress.Text = "📍 本机局域网 Wi-Fi IP：" + GetRealWiFiIp() + "  |  音频传输端口: 8091  |  配对端口: 8090/8092";
+        _localAddress.SetBounds(22, 14, 700, 24);
+        _localAddress.Font = new Font("Microsoft YaHei UI", 9F);
+        _localAddress.ForeColor = TextSub;
         statPanel.Controls.Add(_localAddress);
 
-        var meterLabel = new Label { Text = "麦克风输入电平：", AutoSize = true, Location = new Point(20, 46), ForeColor = Color.FromArgb(71, 85, 105) };
-        _db.Text = "-60 dB";
-        _db.SetBounds(130, 46, 70, 20);
-        _db.Font = new Font(Font.FontFamily, 9F, FontStyle.Bold);
+        var meterLabel = new Label 
+        { 
+            Text = "麦克风实时动态电平：", 
+            AutoSize = true, 
+            Location = new Point(22, 48), 
+            ForeColor = TextMain,
+            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
+        };
+        statPanel.Controls.Add(meterLabel);
 
-        _meter.SetBounds(200, 44, 340, 22);
+        _db.Text = "-60 dB";
+        _db.SetBounds(165, 48, 70, 20);
+        _db.Font = new Font("Consolas", 10F, FontStyle.Bold);
+        _db.ForeColor = TextMuted;
+        statPanel.Controls.Add(_db);
+
+        _meter.SetBounds(240, 46, 360, 22);
         _meter.Maximum = 60;
         _meter.Value = 0;
-
-        _packets.Text = "音频包：0";
-        _packets.SetBounds(560, 46, 120, 20);
-        _packets.ForeColor = Color.FromArgb(100, 116, 139);
-
-        statPanel.Controls.Add(meterLabel);
-        statPanel.Controls.Add(_db);
         statPanel.Controls.Add(_meter);
+
+        _packets.Text = "已收数据包：0";
+        _packets.SetBounds(615, 48, 120, 20);
+        _packets.Font = new Font("Consolas", 9F);
+        _packets.ForeColor = TextMuted;
         statPanel.Controls.Add(_packets);
 
-        _testResult.Text = "💡 测试指引：配对成功后对着手机讲话，点击【测试麦克风是否正常】即可直接听到声音。";
-        _testResult.SetBounds(20, 82, 650, 26);
-        _testResult.ForeColor = Color.FromArgb(100, 116, 139);
+        _testResult.Text = "💡 测试指引：配对成功后对着手机讲话，点击【麦克风自检回放】即可从耳机直接听取回放与时延表现。";
+        _testResult.SetBounds(22, 90, 700, 28);
+        _testResult.Font = new Font("Microsoft YaHei UI", 9F);
+        _testResult.ForeColor = TextMuted;
         statPanel.Controls.Add(_testResult);
     }
 
-    private static void AddRow(Control parent, string caption, Control control, int y)
+    private static void SetupCardPanel(Panel panel, int x, int y, int width, int height)
+    {
+        panel.Location = new Point(x, y);
+        panel.Size = new Size(width, height);
+        panel.BackColor = CardBg;
+        panel.Paint += (s, e) =>
+        {
+            var p = (Panel)s!;
+            using var pen = new Pen(CardBorder, 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
+        };
+    }
+
+    private static void AddStyledRow(Control parent, string caption, Control control, int y, int controlWidth)
     {
         var label = new Label
         {
             Text = caption,
             AutoSize = true,
-            Location = new Point(20, y + 5),
-            ForeColor = Color.FromArgb(71, 85, 105)
+            Location = new Point(22, y + 4),
+            ForeColor = TextSub,
+            Font = new Font("Microsoft YaHei UI", 9.5F)
         };
-        control.SetBounds(130, y, 350, 26);
+        control.SetBounds(140, y, controlWidth, 28);
+        if (control is ComboBox cb)
+        {
+            cb.DropDownStyle = ComboBoxStyle.DropDownList;
+            cb.FlatStyle = FlatStyle.System;
+        }
         parent.Controls.Add(label);
         parent.Controls.Add(control);
+    }
+
+    private static void StylePrimaryButton(Button btn, string text, int x, int y, int w, int h, Color bg)
+    {
+        btn.Text = text;
+        btn.SetBounds(x, y, w, h);
+        btn.BackColor = bg;
+        btn.ForeColor = Color.White;
+        btn.FlatStyle = FlatStyle.Flat;
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+        btn.Cursor = Cursors.Hand;
+    }
+
+    private static void StyleOutlineButton(Button btn, string text, int x, int y, int w, int h)
+    {
+        btn.Text = text;
+        btn.SetBounds(x, y, w, h);
+        btn.BackColor = Color.White;
+        btn.ForeColor = TextSub;
+        btn.FlatStyle = FlatStyle.Flat;
+        btn.FlatAppearance.BorderColor = CardBorder;
+        btn.Font = new Font("Microsoft YaHei UI", 9.5F);
+        btn.Cursor = Cursors.Hand;
     }
 
     private void LoadAudioDevices()
@@ -311,8 +390,6 @@ public sealed class MainForm : Form
             _beaconTimer.Start();
 
             // 2. 启动基于原生 Socket/TcpListener 的 HTTP 配对探测服务 (端口 8090)
-            // 绝不依赖 Windows 系统 HttpListener，任何普通权限用户均可 100% 成功启动！
-            // 彻底解决家用/办公路由器拦截 UDP 广播导致无法配对的死结！
             _tcpPairingServer = new TcpListener(IPAddress.Any, 8090);
             _tcpPairingServer.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _tcpPairingServer.Start();
@@ -420,17 +497,19 @@ public sealed class MainForm : Form
     {
         if (success)
         {
+            _pairCard.BackColor = Color.FromArgb(240, 253, 244); // 柔和薄荷绿
             _pairStatusBadge.Text = "✅ 配对成功 (已建立受信任音频连接)";
-            _pairStatusBadge.ForeColor = Color.FromArgb(16, 185, 129);
+            _pairStatusBadge.ForeColor = AccentGreen;
             _pairDetail.Text = detail + " | 音频链路已就绪，请在手机上开始说话。";
             _pairDetail.ForeColor = Color.FromArgb(22, 101, 52);
         }
         else
         {
+            _pairCard.BackColor = Color.FromArgb(254, 252, 232); // 柔和琥珀黄
             _pairStatusBadge.Text = "⏳ 等待手机配对中";
-            _pairStatusBadge.ForeColor = Color.FromArgb(245, 158, 11);
+            _pairStatusBadge.ForeColor = AccentYellow;
             _pairDetail.Text = detail;
-            _pairDetail.ForeColor = Color.FromArgb(100, 116, 139);
+            _pairDetail.ForeColor = TextSub;
         }
     }
 
@@ -485,21 +564,21 @@ public sealed class MainForm : Form
 
         if (_chkMonitor.Checked)
         {
-            _testResult.Text = "🔊 已开启实时试听监听！对着手机说话即可从电脑扬声器/耳机听到回放。";
-            _testResult.ForeColor = Color.FromArgb(37, 99, 235);
+            _testResult.Text = "🔊 已开启实时试听耳返！对着手机说话即可从电脑扬声器/耳机听到声音。";
+            _testResult.ForeColor = AccentBlue;
         }
         else
         {
-            _testResult.Text = "🔇 已关闭试听监听。";
-            _testResult.ForeColor = Color.FromArgb(100, 116, 139);
+            _testResult.Text = "🔇 已关闭实时试听耳返。";
+            _testResult.ForeColor = TextMuted;
         }
     }
 
     private void RunMicrophoneSelfTest()
     {
         _chkMonitor.Checked = true;
-        _testResult.Text = "🎙️ 正在测试麦克风：请对着手机说话或吹气。电脑扬声器将实时播出，电平条将跳动！";
-        _testResult.ForeColor = Color.FromArgb(16, 185, 129);
+        _testResult.Text = "🎙️ 正在自检回放：请对着手机说话或吹气。电脑扬声器将实时播出，电平条将跳动！";
+        _testResult.ForeColor = AccentGreen;
     }
 
     private void UpdateMeter(int db, long packets)
@@ -512,14 +591,18 @@ public sealed class MainForm : Form
 
         _db.Text = db + " dB";
         _meter.Value = Math.Clamp(db + 60, 0, 60);
-        _packets.Text = "音频包：" + packets;
+        _packets.Text = "已收数据包：" + packets;
 
         if (db > -45)
         {
             _lastSoundTime = DateTime.Now;
-            _testResult.Text = $"✅ 麦克风工作完美！检测到声音信号 ({db} dB)，手机声音正在流畅输入电脑！";
-            _testResult.ForeColor = Color.FromArgb(16, 185, 129);
-            _db.ForeColor = Color.FromArgb(16, 185, 129);
+            _testResult.Text = $"✅ 麦克风工作完美！检测到声音信号 ({db} dB)，手机声音正在低延迟输入电脑！";
+            _testResult.ForeColor = AccentGreen;
+            _db.ForeColor = AccentGreen;
+        }
+        else
+        {
+            _db.ForeColor = TextMuted;
         }
     }
 
@@ -558,22 +641,34 @@ public sealed class MainForm : Form
                 {
                     if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
                     {
-                        string str = ip.Address.ToString();
-                        if (str.StartsWith("192.168.")) return str;
+                        string s = ip.Address.ToString();
+                        if (s.StartsWith("192.168.") && !IPAddress.IsLoopback(ip.Address))
+                        {
+                            return s;
+                        }
                     }
                 }
             }
 
-            // 兜底
-            var fallback = Dns.GetHostEntry(Dns.GetHostName()).AddressList
-                .FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(x) && !x.ToString().StartsWith("169.254."));
-            return fallback?.ToString() ?? "127.0.0.1";
+            // 兜底方案
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                foreach (var ip in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (ip.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip.Address))
+                    {
+                        return ip.Address.ToString();
+                    }
+                }
+            }
         }
-        catch { return "127.0.0.1"; }
+        catch { }
+        return "127.0.0.1";
     }
+}
 
-    private sealed record OutputItem(int Index, string Name)
-    {
-        public override string ToString() => Name;
-    }
+internal sealed record OutputItem(int Index, string Name)
+{
+    public override string ToString() => Name;
 }

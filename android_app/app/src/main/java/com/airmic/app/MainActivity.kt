@@ -305,7 +305,8 @@ class MainActivity : AppCompatActivity(), AudioCaptureService.ServiceCallback {
         textPairStatus.text = "✅ 配对成功 (已连接电脑: $pcName)"
         textPairStatus.setTextColor(Color.parseColor("#10B981"))
         textPairDetail.text = "电脑【$pcName】(IP: $pcIp) 已在线就绪。点击下方大按钮即可开始麦克风拾音！"
-        btnToggleMic.text = "开始麦克风传输"
+        btnToggleMic.text = "▶ 开始麦克风传输"
+        btnToggleMic.setBackgroundResource(R.drawable.btn_primary_gradient)
     }
 
     private fun startStreaming() {
@@ -349,11 +350,11 @@ class MainActivity : AppCompatActivity(), AudioCaptureService.ServiceCallback {
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
         isTransmitting = true
-        btnToggleMic.text = "停止传输"
-        btnToggleMic.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+        btnToggleMic.text = "⏹ 停止传输麦克风"
+        btnToggleMic.setBackgroundResource(R.drawable.btn_stop_gradient)
         textPairStatus.text = "🎙️ 正在实时推流声音中..."
         textPairStatus.setTextColor(Color.parseColor("#38BDF8"))
-        textPairDetail.text = "手机麦克风已激活，请在电脑端点击【测试麦克风是否正常】听取回放效果！"
+        textPairDetail.text = "手机麦克风已激活，请在电脑端听取实时回放与查看跳动电平！"
     }
 
     private fun stopStreaming() {
@@ -368,8 +369,8 @@ class MainActivity : AppCompatActivity(), AudioCaptureService.ServiceCallback {
         }
 
         isTransmitting = false
-        btnToggleMic.text = "开始麦克风传输"
-        btnToggleMic.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_dark))
+        btnToggleMic.text = "▶ 开始麦克风传输"
+        btnToggleMic.setBackgroundResource(R.drawable.btn_primary_gradient)
         if (isPairedSuccessfully) {
             showPairedState(targetPcName ?: "电脑", targetPcIp ?: "局域网")
         } else {
