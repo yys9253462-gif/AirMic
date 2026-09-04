@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="9ikAyO83dzqhfzGfnIqrBZ">
+<head data-page-node-id="yKmUtr8RJQvWFEMHOLyjf7">
+  <meta charset="UTF-8" data-page-node-id="eES3W73QLsetKYpOprTZpx">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" data-page-node-id="s0GmvRrgWy90nOhkEC4NNf">
+  <title>AirMic 手机麦克风发送端</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+    .app-container {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    header {
+      text-align: center;
+      padding: 12px 0 6px 0;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    header h1 span {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+    }
+    .status-badge.connected {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+    .status-badge.transmitting {
+      background: rgba(37, 99, 235, 0.25);
+      color: #60a5fa;
+      animation: pulse 1.5s infinite;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .metrics {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .metrics span b {
+      color: var(--text);
+    }
+    /* 麦克风大按钮 */
+    .mic-button-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 0 16px 0;
+    }
+    .mic-btn {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 3px solid #334155;
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      outline: none;
+    }
+    .mic-btn svg {
+      width: 44px;
+      height: 44px;
+      fill: currentColor;
+      transition: transform 0.2s;
+    }
+    .mic-btn.active {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-color: #60a5fa;
+      color: #ffffff;
+      box-shadow: 0 0 35px rgba(37, 99, 235, 0.6);
+      transform: scale(1.04);
+    }
+    .mic-btn.active svg {
+      animation: mic-bounce 1s infinite alternate ease-in-out;
+    }
+    @keyframes mic-bounce {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); }
+    }
+    .mic-hint {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    /* 波形与电平 */
+    .meter-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .meter-bar-bg {
+      height: 10px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .meter-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981 0%, #3b82f6 70%, #ef4444 100%);
+      border-radius: 6px;
+      transition: width 0.06s ease;
+    }
+    canvas#visualizer {
+      width: 100%;
+      height: 48px;
+      border-radius: 8px;
+      background: #0f172a;
+    }
+    /* 表单与设置 */
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: #334155;
+      color: #e2e8f0;
+    }
+    .btn-secondary:hover {
+      background: #475569;
+    }
+    .range-slider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .range-slider input[type="range"] {
+      flex: 1;
+      accent-color: var(--primary);
+    }
+    .range-val {
+      font-size: 13px;
+      width: 44px;
+      text-align: right;
+      color: var(--text-muted);
+    }
+    /* 底部提示 */
+    .footer-tip {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-top: auto;
+      padding: 10px 0;
+    }
+    .footer-tip a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body data-page-node-id="4by6NFImGltEy3iSJdWGS3">
+  <div class="app-container" data-page-node-id="GFspGDubBEWduIiC9vYvls">
+    <header data-page-node-id="xWrLNDIpmwx1NXTt8vQHcF">
+      <h1 data-page-node-id="vltsUz534Xmm80WLwe2kD9">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-page-node-id="DDd7RJ8xpQUsKMkYHVBevX"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" data-page-node-id="NXwVwUqXGaVTJTz3JHhz60"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" data-page-node-id="T2QQOOlKZbHW6mhxurcrgl"/><line x1="12" x2="12" y1="19" y2="22" data-page-node-id="oXGBrq5tOK3AmDaGoODo8W"/></svg>
+        <span data-page-node-id="WZ4RYD1plyhaJOPCvViyRt">AirMic 手机麦克风</span>
+      </h1>
+      <p data-page-node-id="NDx1eaXJaWrfBpXEhLQXMi">无线低延迟将手机麦克风流式传输至电脑</p>
+    </header>
+
+    <!-- 连接与状态卡片 -->
+    <div class="card" data-page-node-id="LdjhR0k3d8YqlwHTA0mkCX">
+      <div class="status-bar" data-page-node-id="GH5AzaDSMJWO2ohgQibJfx">
+        <div id="statusBadge" class="status-badge" data-page-node-id="8oY1WxpBNxGwh18dnSmjhV">
+          <span class="status-dot" data-page-node-id="PZW4cwH2zBRlGTvDjyQDkR"></span>
+          <span id="statusText" data-page-node-id="gtX0EaV5bGcni3b5ansTTq">未连接</span>
+        </div>
+        <div class="metrics" data-page-node-id="AH2YnU5EQN9wNd3EGeH9ex">
+          <span data-page-node-id="QrXT0lu9BAvUyBMaGbb3WB">延迟: <b id="latencyVal" data-page-node-id="P2mQYIfJsVxvwmv0lgtMWG">--</b> ms</span>
+          <span data-page-node-id="qynM0DmJOR3NQsCY5zYLRw">发包: <b id="packetCount" data-page-node-id="SjbrhRYHCIONzrDbPVkP5e">0</b></span>
+        </div>
+      </div>
+
+      <!-- 大麦克风按钮 -->
+      <div class="mic-button-container" data-page-node-id="Nq5u7jayJaf6NW4Am0Sx6E">
+        <button id="toggleMicBtn" class="mic-btn" disabled data-page-node-id="Gr6enuDHPnQdd3sLwZdQPe">
+          <svg viewBox="0 0 24 24" data-page-node-id="2DvLIdRbVzsipoGCaGzoVu">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" data-page-node-id="4aUe8M32Xo2r0p3JVkX7HP"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" data-page-node-id="Kmkmst0hkdVEnXj0x7dEWT"/>
+          </svg>
+          <span id="btnLabel" data-page-node-id="lLhiVmkIeidcLfOmjCEt5N">点击开始传输</span>
+        </button>
+        <div id="micHint" class="mic-hint" data-page-node-id="n5V5Rl8hlyOufg8r1RFzCw">请先在下方连接电脑端</div>
+      </div>
+
+      <!-- 实时声波与音量电平 -->
+      <div class="meter-container" data-page-node-id="oHs9Qmin6wqqdrDLQP0zw0">
+        <div class="meter-label" data-page-node-id="cBA4DOBnE3NI7bdYgNONHS">
+          <span data-page-node-id="UL706iL5qAzWqGUzXusITz">麦克风电平</span>
+          <span id="meterDb" data-page-node-id="eRduyrt8rmrMiC7EqWAluf">-inf dB</span>
+        </div>
+        <div class="meter-bar-bg" data-page-node-id="rTL7I7rh9RwUdgifeLVhoT">
+          <div id="meterFill" class="meter-bar-fill" data-page-node-id="v3D0jkwPkSgJYvvcE7OJ0J"></div>
+        </div>
+        <canvas id="visualizer" data-page-node-id="mgZSneC6RhzbezcTL8CxPT"></canvas>
+      </div>
+    </div>
+
+    <!-- 服务器连接设置 -->
+    <div class="card" data-page-node-id="gFvTiX7WVYRCZ5cOKBuu78">
+      <div class="form-group" data-page-node-id="f57iwXER9XtfFcMLnCPYTb">
+        <label data-page-node-id="K4lvh3bfSaX8gkje2vQO5u">电脑端连接地址 (IP 与 端口)</label>
+        <div class="input-row" data-page-node-id="IyOA9HuQfBYEd6wtHgLAVm">
+          <input type="text" id="serverHost" placeholder="例如: 192.168.1.5:8090" value="" data-page-node-id="cMBpxFx2xCrT8OOVmEByGe">
+          <button id="connectBtn" class="btn" data-page-node-id="uHzpRZ7wJTFxlji0nvP9W9">连接</button>
+        </div>
+      </div>
+
+      <div class="form-group" data-page-node-id="QGsr3X0X8SMSV6c9t7czZc">
+        <label data-page-node-id="PEsZEQHi5Wk1WLIeGb5xIY">采样率与音质模式</label>
+        <select id="sampleRateSelect" data-page-node-id="Em5JzVKK9Hd33xMRy30MMt">
+          <option value="48000" data-page-node-id="8F29fYh0gG3HuDywvQGTwM">48,000 Hz (高质量 / 会议与直播推荐)</option>
+          <option value="44100" selected data-page-node-id="wEpHF4qPZ21sXGlXBlaNbW">44,100 Hz (CD 级标准 / 均衡)</option>
+          <option value="16000" data-page-node-id="EYHBEap3GzBVL3eBwU2RjM">16,000 Hz (宽带语音 / 超低带宽)</option>
+        </select>
+      </div>
+
+      <div class="form-group" data-page-node-id="uOqVoipOQub4BNIjnNtBj5">
+        <label data-page-node-id="jvWh0nzAa0DJblbSvrOOxH">输入增益 (音量放大)</label>
+        <div class="range-slider" data-page-node-id="shwozfERbot5ct117b5VuK">
+          <input type="range" id="gainSlider" min="0.5" max="3.0" step="0.1" value="1.0" data-page-node-id="zFsS3Oqe9ViYHbahoPcSlF">
+          <span class="range-val" id="gainVal" data-page-node-id="1CZH3UQS4QqjPzDvQxfEa0">1.0x</span>
+        </div>
+      </div>
+
+      <div class="form-group" data-page-node-id="pOOxhM5x8hsSzzXT1SHBM7">
+        <label data-page-node-id="4F9L3X2iCS4s8Bg859oCga">传输缓冲区 (平衡延迟与抗抖动)</label>
+        <select id="bufferSizeSelect" data-page-node-id="zscXaXsB7Dx5sntQ9Ds3Ht">
+          <option value="512" data-page-node-id="k6RXOBBj1TVXvfCZfJmr2C">极低延迟 (512 采样 ~11ms, 适合电竞/强信号)</option>
+          <option value="1024" selected data-page-node-id="PuswHhPHsbEjuItVCxhwOr">均衡推荐 (1024 采样 ~23ms)</option>
+          <option value="2048" data-page-node-id="b2eSpGc7usfqr2GtOHkwWG">稳定抗丢包 (2048 采样 ~46ms)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="footer-tip" data-page-node-id="hKqDW2Kk84frpii2LQTE0X">
+      提示：可通过手机同一 Wi-Fi 或电脑开热点连接；也可使用 USB 开启网络共享/ADB。<br data-page-node-id="jz5ArisdYCIWtnDn0W9bxj">
+      AirMic v1.0.0 · 遵循系统原生安全与麦克风隐私规范
+    </div>
+  </div>
+
+  <script>
+    // 状态管理
+    const state = {
+      connected: false,
+      transmitting: false,
+      ws: null,
+      audioCtx: null,
+      micStream: null,
+      sourceNode: null,
+      gainNode: null,
+      processorNode: null,
+      analyserNode: null,
+      gainValue: 1.0,
+      sampleRate: 44100,
+      bufferSize: 1024,
+      packetSeq: 0,
+      packetsSent: 0,
+      pingInterval: null,
+      reconnectTimer: null,
+      lastPingTime: 0
+    };
+
+    // DOM 元素
+    const serverHostInput = document.getElementById('serverHost');
+    const connectBtn = document.getElementById('connectBtn');
+    const toggleMicBtn = document.getElementById('toggleMicBtn');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const btnLabel = document.getElementById('btnLabel');
+    const micHint = document.getElementById('micHint');
+    const latencyVal = document.getElementById('latencyVal');
+    const packetCount = document.getElementById('packetCount');
+    const meterFill = document.getElementById('meterFill');
+    const meterDb = document.getElementById('meterDb');
+    const visualizer = document.getElementById('visualizer');
+    const vCtx = visualizer.getContext('2d');
+    const gainSlider = document.getElementById('gainSlider');
+    const gainVal = document.getElementById('gainVal');
+    const sampleRateSelect = document.getElementById('sampleRateSelect');
+    const bufferSizeSelect = document.getElementById('bufferSizeSelect');
+
+    // 初始化：如果通过扫码或 URL 参数打开，自动填充 IP
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostParam = urlParams.get('host');
+    if (hostParam) {
+      serverHostInput.value = hostParam;
+    } else if (window.location.host) {
+      // 若手机直接通过网页访问当前电脑服务，默认填当前 host
+      serverHostInput.value = window.location.host;
+    }
+
+    // 增益调节
+    gainSlider.addEventListener('input', (e) => {
+      state.gainValue = parseFloat(e.target.value);
+      gainVal.textContent = state.gainValue.toFixed(1) + 'x';
+      if (state.gainNode) {
+        state.gainNode.gain.setValueAtTime(state.gainValue, state.audioCtx.currentTime);
+      }
+    });
+
+    sampleRateSelect.addEventListener('change', (e) => {
+      state.sampleRate = parseInt(e.target.value, 10);
+      if (state.transmitting) {
+        restartAudioStream();
+      }
+    });
+
+    bufferSizeSelect.addEventListener('change', (e) => {
+      state.bufferSize = parseInt(e.target.value, 10);
+      if (state.transmitting) {
+        restartAudioStream();
+      }
+    });
+
+    // 连接 / 断开服务器
+    connectBtn.addEventListener('click', () => {
+      if (state.connected) {
+        disconnectServer();
+      } else {
+        const host = serverHostInput.value.trim();
+        if (!host) {
+          alert('请输入电脑端的 IP 和端口！');
+          return;
+        }
+        connectServer(host);
+      }
+    });
+
+    function connectServer(host) {
+      updateStatus('connecting', '正在连接电脑...');
+      connectBtn.disabled = true;
+
+      // 协议头自动判断 ws:// 或 wss://
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = `${protocol}${host}/ws-audio`;
+
+      try {
+        if (state.ws) {
+          state.ws.close();
+        }
+        state.ws = new WebSocket(wsUrl);
+        state.ws.binaryType = 'arraybuffer';
+
+        state.ws.onopen = () => {
+          state.connected = true;
+          connectBtn.disabled = false;
+          connectBtn.textContent = '断开';
+          connectBtn.classList.add('btn-secondary');
+          toggleMicBtn.disabled = false;
+          updateStatus('connected', '已连接电脑');
+          micHint.textContent = '点击麦克风图标开启音频传输';
+
+          // 发送客户端握手信息
+          sendMetaHandshake();
+
+          // 开启心跳测算延迟
+          startHeartbeat();
+        };
+
+        state.ws.onmessage = (event) => {
+          if (typeof event.data === 'string') {
+            try {
+              const msg = JSON.parse(event.data);
+              if (msg.type === 'pong') {
+                const rtt = Math.round(performance.now() - state.lastPingTime);
+                latencyVal.textContent = rtt;
+              } else if (msg.type === 'remote_control') {
+                if (msg.action === 'mute' && state.transmitting) {
+                  stopAudioStream();
+                } else if (msg.action === 'unmute' && !state.transmitting) {
+                  startAudioStream();
+                }
+              }
+            } catch (err) {}
+          }
+        };
+
+        state.ws.onclose = () => {
+          onConnectionLost('连接已断开');
+        };
+
+        state.ws.onerror = (err) => {
+          console.error('WebSocket 错误', err);
+          onConnectionLost('连接失败，请确认IP/防火墙');
+        };
+      } catch (e) {
+        onConnectionLost('网络异常: ' + e.message);
+      }
+    }
+
+    function sendMetaHandshake() {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({
+          type: 'handshake',
+          client: 'AirMic-Web-Client',
+          sampleRate: state.sampleRate,
+          channels: 1,
+          format: 'pcm_s16le',
+          bufferSize: state.bufferSize
+        }));
+      }
+    }
+
+    function startHeartbeat() {
+      clearInterval(state.pingInterval);
+      state.pingInterval = setInterval(() => {
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+          state.lastPingTime = performance.now();
+          state.ws.send(JSON.stringify({ type: 'ping', t: state.lastPingTime }));
+        }
+      }, 2000);
+    }
+
+    function disconnectServer() {
+      stopAudioStream();
+      clearInterval(state.pingInterval);
+      if (state.ws) {
+        state.ws.close();
+        state.ws = null;
+      }
+      state.connected = false;
+      connectBtn.disabled = false;
+      connectBtn.textContent = '连接';
+      connectBtn.classList.remove('btn-secondary');
+      toggleMicBtn.disabled = true;
+      updateStatus('disconnected', '未连接');
+      micHint.textContent = '请先连接电脑端';
+      latencyVal.textContent = '--';
+    }
+
+    function onConnectionLost(msg) {
+      stopAudioStream();
+      clearInterval(state.pingInterval);
+      state.connected = false;
+      connectBtn.disabled = false;
+      connectBtn.textContent = '连接';
+      connectBtn.classList.remove('btn-secondary');
+      toggleMicBtn.disabled = true;
+      updateStatus('disconnected', msg);
+      micHint.textContent = '请重新检查网络后连接';
+      latencyVal.textContent = '--';
+    }
+
+    function updateStatus(status, text) {
+      statusBadge.className = 'status-badge ' + (status === 'transmitting' ? 'transmitting' : (status === 'connected' ? 'connected' : ''));
+      statusText.textContent = text;
+    }
+
+    // 麦克风控制按钮
+    toggleMicBtn.addEventListener('click', async () => {
+      if (!state.transmitting) {
+        await startAudioStream();
+      } else {
+        stopAudioStream();
+      }
+    });
+
+    // 开启麦克风采集并流式发送
+    async function startAudioStream() {
+      try {
+        // 请求手机原生高保真麦克风权限
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: state.sampleRate,
+            channelCount: 1,
+            echoCancellation: false, // 追求低延迟与原声录入，可根据需求关闭回声消除/降噪
+            noiseSuppression: false,
+            autoGainControl: false,
+            latency: 0.01
+          },
+          video: false
+        });
+        state.micStream = stream;
+
+        // 创建 AudioContext
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        state.audioCtx = new AudioContext({
+          sampleRate: state.sampleRate,
+          latencyHint: 'interactive'
+        });
+
+        state.sourceNode = state.audioCtx.createMediaStreamSource(stream);
+        state.gainNode = state.audioCtx.createGain();
+        state.gainNode.gain.setValueAtTime(state.gainValue, state.audioCtx.currentTime);
+
+        // 分析节点 (用于绘制波形与电平米)
+        state.analyserNode = state.audioCtx.createAnalyser();
+        state.analyserNode.fftSize = 256;
+
+        // ScriptProcessorNode 处理 PCM 流 (跨移动端兼顾兼容性与实时性)
+        state.processorNode = state.audioCtx.createScriptProcessor(state.bufferSize, 1, 1);
+
+        state.processorNode.onaudioprocess = (e) => {
+          if (!state.transmitting || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+
+          const inputFloat32 = e.inputBuffer.getChannelData(0);
+          const len = inputFloat32.length;
+
+          // 转换为 16-bit PCM (Little-Endian)
+          // 格式遵循 AirMic 帧头: 0x41 0x4D (Magic) + Seq(2B) + Timestamp(4B) + Data(2*len)
+          const headerSize = 8;
+          const byteBuffer = new ArrayBuffer(headerSize + len * 2);
+          const dataView = new DataView(byteBuffer);
+
+          // Magic 'AM'
+          dataView.setUint8(0, 0x41);
+          dataView.setUint8(1, 0x4D);
+          // Sequence ID
+          dataView.setUint16(2, state.packetSeq++ % 65536, true);
+          // Timestamp (ms)
+          dataView.setUint32(4, Math.floor(performance.now()) & 0xFFFFFFFF, true);
+
+          // PCM 采样数据转换
+          let offset = headerSize;
+          for (let i = 0; i < len; i++) {
+            let s = Math.max(-1, Math.min(1, inputFloat32[i]));
+            let val = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            dataView.setInt16(offset, val, true);
+            offset += 2;
+          }
+
+          state.ws.send(byteBuffer);
+          state.packetsSent++;
+          packetCount.textContent = state.packetsSent;
+        };
+
+        // 串接音频图谱
+        state.sourceNode.connect(state.gainNode);
+        state.gainNode.connect(state.analyserNode);
+        state.analyserNode.connect(state.processorNode);
+        state.processorNode.connect(state.audioCtx.destination);
+
+        state.transmitting = true;
+        toggleMicBtn.classList.add('active');
+        btnLabel.textContent = '停止传输';
+        micHint.textContent = '● 手机麦克风正在实时传输中...';
+        updateStatus('transmitting', '正在传输音频');
+
+        // 启动动画渲染
+        drawVisualizer();
+
+      } catch (err) {
+        console.error('麦克风启动失败:', err);
+        alert('无法访问手机麦克风: ' + err.message + '\n请确认已授予浏览器录音权限，且处于局域网安全的 HTTPS 或 localhost/IP 模式。');
+        stopAudioStream();
+      }
+    }
+
+    function stopAudioStream() {
+      state.transmitting = false;
+      toggleMicBtn.classList.remove('active');
+      btnLabel.textContent = '点击开始传输';
+      if (state.connected) {
+        updateStatus('connected', '已连接电脑 (待命)');
+        micHint.textContent = '点击麦克风图标开启音频传输';
+      }
+
+      if (state.processorNode) {
+        state.processorNode.disconnect();
+        state.processorNode = null;
+      }
+      if (state.sourceNode) {
+        state.sourceNode.disconnect();
+        state.sourceNode = null;
+      }
+      if (state.audioCtx) {
+        state.audioCtx.close();
+        state.audioCtx = null;
+      }
+      if (state.micStream) {
+        state.micStream.getTracks().forEach(t => t.stop());
+        state.micStream = null;
+      }
+
+      // 归零指示器
+      meterFill.style.width = '0%';
+      meterDb.textContent = '-inf dB';
+    }
+
+    function restartAudioStream() {
+      if (state.transmitting) {
+        stopAudioStream();
+        setTimeout(startAudioStream, 200);
+      }
+    }
+
+    // 波形绘制与电平测量
+    function drawVisualizer() {
+      if (!state.transmitting || !state.analyserNode) return;
+
+      requestAnimationFrame(drawVisualizer);
+
+      const bufferLength = state.analyserNode.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      state.analyserNode.getByteTimeDomainData(dataArray);
+
+      // 计算 RMS 电平
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const val = (dataArray[i] - 128) / 128;
+        sum += val * val;
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+      const db = 20 * Math.log10(Math.max(rms, 0.0001));
+      const dbDisplay = Math.max(-60, Math.round(db));
+      meterDb.textContent = (dbDisplay <= -60 ? '-inf' : dbDisplay) + ' dB';
+
+      const meterPct = Math.min(100, Math.max(0, (dbDisplay + 60) * 1.66));
+      meterFill.style.width = meterPct + '%';
+
+      // 绘制实时声波
+      const width = visualizer.width = visualizer.clientWidth;
+      const height = visualizer.height = visualizer.clientHeight;
+      vCtx.clearRect(0, 0, width, height);
+
+      vCtx.lineWidth = 2;
+      vCtx.strokeStyle = '#38bdf8';
+      vCtx.beginPath();
+
+      const sliceWidth = width * 1.0 / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * (height / 2);
+
+        if (i === 0) {
+          vCtx.moveTo(x, y);
+        } else {
+          vCtx.lineTo(x, y);
+        }
+        x += sliceWidth;
+      }
+      vCtx.lineTo(width, height / 2);
+      vCtx.stroke();
+    }
+  </script>
+</body>
+</html>

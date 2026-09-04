@@ -1,0 +1,14 @@
+{
+  "name": "airmic-desktop",
+  "version": "1.0.0",
+  "description": "AirMic - Use phone microphone on PC with ultra-low latency & virtual audio cable",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.21.3"
+  }
+}

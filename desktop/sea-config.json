@@ -1,0 +1,11 @@
+{
+  "main": "build/server.bundle.js",
+  "output": "build/airmic-sea.blob",
+  "disableExperimentalSEAWarning": true,
+  "useCodeCache": false,
+  "assets": {
+    "desktop/public/index.html": "public/index.html",
+    "mobile/index.html": "../mobile/index.html",
+    "mobile/manifest.json": "../mobile/manifest.json"
+  }
+}

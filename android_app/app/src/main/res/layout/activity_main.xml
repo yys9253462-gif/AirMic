@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F172A"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- 顶部标题 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="AirMic 手机麦克风"
+        android:textColor="#F8FAFC"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="零配置免输入 · 局域网一键自动配对"
+        android:textColor="#94A3B8"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 核心配对状态卡片 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E293B"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="配对状态"
+            android:textColor="#94A3B8"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/textPairStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⏳ 正在搜索电脑端..."
+            android:textColor="#F59E0B"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/textPairDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="确保手机与电脑在同一 Wi-Fi 下，无需输入任何 IP，App 将自动搜索电脑并建立配对。"
+            android:textColor="#94A3B8"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+    </LinearLayout>
+
+    <!-- 连接方式选择 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="连接方式 (直接点击切换)"
+        android:textColor="#E2E8F0"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <RadioGroup
+        android:id="@+id/radioGroupTransport"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#1E293B"
+        android:padding="6dp"
+        android:layout_marginBottom="20dp">
+
+        <RadioButton
+            android:id="@+id/radioWifi"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.2"
+            android:checked="true"
+            android:text="Wi-Fi (自动配对)"
+            android:textColor="#F8FAFC" />
+
+        <RadioButton
+            android:id="@+id/radioBt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="蓝牙 (SPP)"
+            android:textColor="#F8FAFC" />
+
+        <RadioButton
+            android:id="@+id/radioUsb"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="USB (ADB)"
+            android:textColor="#F8FAFC" />
+    </RadioGroup>
+
+    <!-- 音质规格 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="音频采样规格"
+        android:textColor="#E2E8F0"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <Spinner
+        android:id="@+id/spinnerSampleRate"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:background="#1E293B"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 实时声音动态 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E293B"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_marginBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="麦克风实时动态输入"
+                android:textColor="#94A3B8"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/textDb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-inf dB"
+                android:textColor="#F8FAFC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/progressBarLevel"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#10B981" />
+    </LinearLayout>
+
+    <!-- 核心配对与启停按钮 -->
+    <Button
+        android:id="@+id/btnToggleMic"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:text="与电脑配对并开始传输"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#2563EB" />
+
+</LinearLayout>

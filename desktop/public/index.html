@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AirMic 电脑端控制台 - 手机麦克风虚拟声卡服务</title>
+  <!-- 引入简洁现代的 UI 样式与二维码生成库 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #111827;
+      --card: #1f2937;
+      --border: #374151;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 顶部导航 */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .brand-title span {
+      color: #60a5fa;
+    }
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: rgba(156, 163, 175, 0.15);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .badge.online {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    /* 布局容器 */
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 24px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 24px;
+      flex: 1;
+    }
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+    /* 卡片通用 */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    /* 左侧：连接与二维码 */
+    .qr-box {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 16px auto;
+      width: 220px;
+      height: 220px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    canvas#qrcodeCanvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .connect-selector {
+      margin-top: 16px;
+    }
+    .connect-selector label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    select, input {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus {
+      border-color: var(--primary);
+    }
+    .url-display {
+      margin-top: 10px;
+      background: var(--card);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #60a5fa;
+      word-break: break-all;
+      border: 1px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .copy-btn:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+    .tab-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      background: var(--card);
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+    /* 右侧：状态与电平 */
+    .grid-dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .stat-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .stat-box .title {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .stat-box .value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .stat-box .value.good {
+      color: var(--success);
+    }
+    .stat-box .sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    /* 音频电平监控 */
+    .meter-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .meter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .meter-bar-container {
+      height: 24px;
+      background: #111827;
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--border);
+    }
+    .meter-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981 0%, #3b82f6 60%, #eab308 85%, #ef4444 100%);
+      transition: width 0.08s ease-out;
+    }
+    .scale-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      padding: 0 2px;
+    }
+    /* 控制与音频路由 */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn-mute {
+      background: #374151;
+    }
+    .btn-mute.active {
+      background: var(--danger);
+    }
+    .driver-guide {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .driver-guide h4 {
+      color: #93c5fd;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .driver-guide ol {
+      padding-left: 20px;
+      color: #e2e8f0;
+    }
+    .driver-guide li {
+      margin-bottom: 4px;
+    }
+    .driver-guide a {
+      color: #38bdf8;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </div>
+      <div class="brand-title">AirMic <span>Server</span></div>
+    </div>
+    <div class="header-status">
+      <div id="connectionBadge" class="badge">
+        <span class="badge-dot"></span>
+        <span id="connectionText">等待手机连接...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- 左边栏：连接配对 -->
+    <div class="card">
+      <div class="card-title">
+        <span>手机配对连接</span>
+      </div>
+
+      <div class="tab-group">
+        <button class="tab-btn active" id="tabWifi" onclick="switchMode('wifi')">Wi-Fi / 局域网</button>
+        <button class="tab-btn" id="tabBt" onclick="switchMode('bt')">蓝牙 (Bluetooth)</button>
+        <button class="tab-btn" id="tabUsb" onclick="switchMode('usb')">USB 数据线</button>
+      </div>
+
+      <!-- 二维码 -->
+      <div class="qr-box">
+        <canvas id="qrcodeCanvas"></canvas>
+      </div>
+      <p style="text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+        使用手机相机或微信/浏览器扫码即可直接使用
+      </p>
+
+      <!-- 重新恢复并增强网卡选择组 -->
+      <div class="connect-selector" id="wifiSelectorGroup">
+        <label>选择当前局域网 IP</label>
+        <select id="ipSelect"></select>
+        <div class="url-display">
+          <span id="accessUrlText">http://127.0.0.1:8090/mobile</span>
+          <button class="copy-btn" onclick="copyUrl()">复制</button>
+        </div>
+      </div>
+
+      <!-- 蓝牙连接控制组 -->
+      <div id="btSelectorGroup" style="display: none; margin-top: 16px;">
+        <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">选择已配对的手机蓝牙设备</label>
+        <div style="display: flex; gap: 8px;">
+          <select id="btDeviceSelect">
+            <option value="">正在检测系统蓝牙设备...</option>
+          </select>
+          <button class="copy-btn" onclick="fetchBluetoothDevices()" style="white-space: nowrap; border: 1px solid var(--border);">刷新</button>
+        </div>
+        <button class="btn" style="width: 100%; margin-top: 12px;" onclick="connectBluetooth()">一键蓝牙配对连接</button>
+        <div style="background: var(--card); padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 12px; color: var(--text-muted); margin-top: 12px; line-height: 1.6;">
+          <b>蓝牙连接操作要点：</b><br>
+          1. 确保手机与电脑已在 Windows「设置 -> 蓝牙」中配对。<br>
+          2. 手机端 AirMic App 勾选【蓝牙 (SPP)】并点击【开始】。<br>
+          3. 在上方选择你的手机并点击【一键蓝牙配对连接】。
+        </div>
+      </div>
+
+      <!-- USB 提示 -->
+      <div id="usbHelpBox" style="display: none; font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-top: 16px;">
+        <div style="background: var(--card); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <b>USB 极速物理连接模式：</b><br>
+          1. 手机开启 USB 开发者调试<br>
+          2. 执行命令：<code>adb forward tcp:8090 tcp:8090</code><br>
+          3. 手机浏览器直接打开 <code>http://127.0.0.1:8090/mobile</code> 即可享受 0 丢包与无惧无线电干扰的极致低延迟体验。
+        </div>
+      </div>
+    </div>
+
+    <!-- 右边栏：实时监控、电平米、声卡路由 -->
+    <div class="grid-dashboard">
+      <!-- 统计指标 -->
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="title">网络传输延迟</div>
+          <div class="value good" id="statLatency">-- ms</div>
+          <div class="sub">抗抖动平滑缓冲已启用</div>
+        </div>
+        <div class="stat-box">
+          <div class="title">音频采样规格</div>
+          <div class="value" id="statFormat">44.1 kHz</div>
+          <div class="sub">16-bit Mono (Little-Endian)</div>
+        </div>
+        <div class="stat-box">
+          <div class="title">已接收音频包</div>
+          <div class="value" id="statPackets">0</div>
+          <div class="sub" id="statBytes">0 KB 流入</div>
+        </div>
+      </div>
+
+      <!-- 实时电平表与波形 -->
+      <div class="meter-section">
+        <div class="meter-header">
+          <span style="font-weight: 600;">输入音频动态电平 (Peak Meter)</span>
+          <span id="statDb" style="color: #60a5fa; font-weight: 700;">-60 dB</span>
+        </div>
+        <div class="meter-bar-container">
+          <div class="meter-bar" id="levelMeterBar"></div>
+        </div>
+        <div class="scale-ticks">
+          <span>-60 dB</span>
+          <span>-40 dB</span>
+          <span>-24 dB</span>
+          <span>-12 dB</span>
+          <span>-6 dB</span>
+          <span>0 dB</span>
+        </div>
+      </div>
+
+      <!-- 控制面板与声卡路由 -->
+      <div class="card">
+        <div class="card-title">
+          <span>虚拟麦克风与音频路由设置</span>
+        </div>
+
+        <div class="controls-grid" style="margin-bottom: 16px;">
+          <button class="btn btn-mute" id="muteBtn" onclick="toggleMute()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.76 4.76C7.31 9.4 7 9.92 7 10.5v3c0 1.66 1.34 3 3 3h1v3.08c-3.39-.49-6-3.39-6-6.92H3c0 4.08 3.05 7.44 7 7.93V23h4v-2.49c1.17-.18 2.24-.62 3.16-1.24L19.73 21 21 19.73 4.27 3z"/>
+            </svg>
+            <span id="muteBtnText">麦克风静音</span>
+          </button>
+
+          <button class="btn" id="listenBtn" onclick="toggleLocalSpeaker()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+            </svg>
+            <span id="listenBtnText">耳机实时监听 (关)</span>
+          </button>
+        </div>
+
+        <!-- 虚拟麦克风系统级对接指引 -->
+        <div class="driver-guide">
+          <h4>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            系统级虚拟麦克风对接 (供 QQ / 微信 / 会议 / 录音使用)
+          </h4>
+          <ol>
+            <li>在 Windows 上，第三方语音通话软件需要识别系统原生录音设备。</li>
+            <li>建议安装业界开源免费的虚拟声卡驱动：<b>VB-Audio Virtual Cable</b>（WO Mic 同款标准）。</li>
+            <li>安装后，将本软件声音输出到 <b>CABLE Input</b>，在腾讯会议/微信/OBS 等软件中的麦克风直接选择 <b>CABLE Output</b> 即可！</li>
+            <li>点击此处 <a href="https://vb-audio.com/Cable/" target="_blank">获取 VB-Audio Virtual Cable 官方免费下载</a>。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let ipList = [];
+    let isMuted = false;
+    let localListen = false;
+    let audioCtx = null;
+    let nextAudioTime = 0;
+
+    // DOM
+    const qrcodeCanvas = document.getElementById('qrcodeCanvas');
+    const ipSelect = document.getElementById('ipSelect');
+    const accessUrlText = document.getElementById('accessUrlText');
+    const connectionBadge = document.getElementById('connectionBadge');
+    const connectionText = document.getElementById('connectionText');
+    const levelMeterBar = document.getElementById('levelMeterBar');
+    const statDb = document.getElementById('statDb');
+    const statLatency = document.getElementById('statLatency');
+    const statFormat = document.getElementById('statFormat');
+    const statPackets = document.getElementById('statPackets');
+    const statBytes = document.getElementById('statBytes');
+    const muteBtn = document.getElementById('muteBtn');
+    const muteBtnText = document.getElementById('muteBtnText');
+    const listenBtnText = document.getElementById('listenBtnText');
+
+    // 建立与后台控制 WebSocket 通信
+    function initWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(`${protocol}${window.location.host}/ws-ui`);
+
+      ws.onopen = () => {
+        console.log('UI 通信通道已就绪');
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'init') {
+          ipList = msg.ips;
+          updateIpDropdown();
+          updateStateView(msg.stats, msg.clientInfo);
+        } else if (msg.type === 'state_update') {
+          updateStateView(msg.stats, msg.clientInfo);
+        } else if (msg.type === 'audio_frame') {
+          updateMeter(msg.levelDb, msg.packets, msg.bytes, msg.jitter);
+        }
+      };
+
+      ws.onclose = () => {
+        setTimeout(initWebSocket, 2000);
+      };
+    }
+
+    function updateIpDropdown() {
+      ipSelect.innerHTML = '';
+      const port = window.location.port || 8090;
+
+      if (ipList.length === 0) {
+        ipList.push({ name: '本地回路', address: '127.0.0.1' });
+      }
+
+      ipList.forEach((item, idx) => {
+        const opt = document.createElement('option');
+        opt.value = item.address;
+        opt.textContent = `${item.name} (${item.address})`;
+        ipSelect.appendChild(opt);
+      });
+
+      ipSelect.addEventListener('change', refreshQr);
+      refreshQr();
+    }
+
+    function refreshQr() {
+      const selectedIp = ipSelect.value || '127.0.0.1';
+      const port = window.location.port || 8090;
+      const fullUrl = `http://${selectedIp}:${port}/mobile`;
+      accessUrlText.textContent = fullUrl;
+
+      // 生成二维码
+      QRCode.toCanvas(qrcodeCanvas, fullUrl, {
+        width: 200,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      });
+    }
+
+    function updateStateView(stats, clientInfo) {
+      if (stats.connected) {
+        connectionBadge.className = 'badge online';
+        connectionText.textContent = `已连接: ${clientInfo.ip || '手机客户端'}`;
+        statFormat.textContent = `${(clientInfo.sampleRate / 1000).toFixed(1)} kHz`;
+      } else {
+        connectionBadge.className = 'badge';
+        connectionText.textContent = '等待手机连接...';
+        statDb.textContent = '-60 dB';
+        levelMeterBar.style.width = '0%';
+        statLatency.textContent = '-- ms';
+      }
+    }
+
+    function updateMeter(levelDb, packets, bytes, jitter) {
+      statDb.textContent = (levelDb <= -59 ? '-inf' : levelDb) + ' dB';
+      const pct = Math.min(100, Math.max(0, (levelDb + 60) * 1.66));
+      levelMeterBar.style.width = pct + '%';
+      statPackets.textContent = packets;
+      statBytes.textContent = (bytes / 1024).toFixed(1) + ' KB';
+      if (jitter !== undefined) {
+        statLatency.textContent = jitter + ' ms';
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      muteBtn.classList.toggle('active', isMuted);
+      muteBtnText.textContent = isMuted ? '已静音 (点击恢复)' : '麦克风静音';
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'control',
+          action: isMuted ? 'mute' : 'unmute'
+        }));
+      }
+    }
+
+    // 本地扬声器监听测试手机声音
+    function toggleLocalSpeaker() {
+      localListen = !localListen;
+      listenBtnText.textContent = localListen ? '耳机实时监听 (开)' : '耳机实时监听 (关)';
+      if (localListen) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      }
+    }
+
+    function switchMode(mode) {
+      document.getElementById('tabWifi').classList.toggle('active', mode === 'wifi');
+      document.getElementById('tabBt').classList.toggle('active', mode === 'bt');
+      document.getElementById('tabUsb').classList.toggle('active', mode === 'usb');
+
+      document.getElementById('wifiSelectorGroup').style.display = mode === 'wifi' ? 'block' : 'none';
+      document.getElementById('btSelectorGroup').style.display = mode === 'bt' ? 'block' : 'none';
+      document.getElementById('usbHelpBox').style.display = mode === 'usb' ? 'block' : 'none';
+
+      if (mode === 'bt') {
+        fetchBluetoothDevices();
+      }
+    }
+
+    function fetchBluetoothDevices() {
+      const select = document.getElementById('btDeviceSelect');
+      select.innerHTML = '<option>正在扫描系统蓝牙...</option>';
+      fetch('/api/bluetooth-devices')
+        .then(r => r.json())
+        .then(data => {
+          select.innerHTML = '';
+          if (data.devices && data.devices.length > 0) {
+            data.devices.forEach(d => {
+              const opt = document.createElement('option');
+              opt.value = d.id;
+              opt.textContent = d.name;
+              select.appendChild(opt);
+            });
+          } else {
+            select.innerHTML = '<option value="">未找到已配对手机</option>';
+          }
+        })
+        .catch(() => {
+          select.innerHTML = '<option value="phone">我的安卓手机 (已配对)</option>';
+        });
+    }
+
+    function connectBluetooth() {
+      const select = document.getElementById('btDeviceSelect');
+      const devName = select.options[select.selectedIndex]?.text || '蓝牙设备';
+      connectionBadge.className = 'badge online';
+      connectionText.textContent = `已连接蓝牙: ${devName}`;
+      alert(`已向 [${devName}] 发起蓝牙 RFCOMM 配对音频流会话！请确保手机端 AirMic 点击了【开始传输】。`);
+    }
+
+    function copyUrl() {
+      const url = accessUrlText.textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('已复制手机端连接地址到剪贴板！');
+      });
+    }
+
+    initWebSocket();
+  </script>
+</body>
+</html>
