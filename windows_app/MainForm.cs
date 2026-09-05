@@ -47,12 +47,11 @@ public sealed class MainForm : Form
     // AI 实时语音字幕组件
     private readonly LlmSubtitleService _subtitleService = new();
     private readonly LyricSubtitleForm _lyricForm = new();
+    private AppConfig _config = new();
     private readonly CheckBox _chkEnableSubtitle = new();
     private readonly CheckBox _chkAutoTranslate = new();
     private readonly CheckBox _chkShowLyricBar = new();
-    private readonly ComboBox _llmPreset = new();
-    private readonly TextBox _txtApiUrl = new();
-    private readonly TextBox _txtApiKey = new();
+    private readonly Button _btnOpenSettings = new();
     private readonly Label _lblLiveSubtitleZh = new();
     private readonly Label _lblLiveSubtitleEn = new();
     private readonly Label _lblSubtitleStatus = new();
@@ -97,6 +96,7 @@ public sealed class MainForm : Form
 
         BuildUi();
         LoadAudioDevices();
+        LoadPersistedConfig();
         HookEvents();
 
         // 启动配对中枢与音频监听
@@ -291,7 +291,7 @@ public sealed class MainForm : Form
 
         // 5. 大模型实时语音字幕与自动翻译卡片
         var subtitlePanel = new Panel();
-        SetupCardPanel(subtitlePanel, 0, 665, 800, 290);
+        SetupCardPanel(subtitlePanel, 0, 665, 800, 225);
         subtitlePanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         scrollContainer.Controls.Add(subtitlePanel);
 
@@ -331,59 +331,23 @@ public sealed class MainForm : Form
         _chkShowLyricBar.Cursor = Cursors.Hand;
         subtitlePanel.Controls.Add(_chkShowLyricBar);
 
-        // API 服务配置行
-        var lblApiProvider = new Label
-        {
-            Text = "大模型服务商：",
-            AutoSize = true,
-            Location = new Point(20, 80),
-            ForeColor = TextSub,
-            Font = new Font("Microsoft YaHei UI", 9F)
-        };
-        subtitlePanel.Controls.Add(lblApiProvider);
-
-        _llmPreset.SetBounds(120, 76, 200, 26);
-        _llmPreset.DropDownStyle = ComboBoxStyle.DropDownList;
-        _llmPreset.Items.AddRange(new object[] { "OpenAI 官方", "DeepSeek / 本地中转", "自定义 API 端点" });
-        _llmPreset.SelectedIndex = 0;
-        subtitlePanel.Controls.Add(_llmPreset);
-
-        var lblApiUrl = new Label
-        {
-            Text = "API 地址：",
-            AutoSize = true,
-            Location = new Point(335, 80),
-            ForeColor = TextSub,
-            Font = new Font("Microsoft YaHei UI", 9F)
-        };
-        subtitlePanel.Controls.Add(lblApiUrl);
-
-        _txtApiUrl.SetBounds(405, 76, 365, 24);
-        _txtApiUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        _txtApiUrl.Text = "https://api.openai.com/v1";
-        subtitlePanel.Controls.Add(_txtApiUrl);
-
-        var lblKey = new Label
-        {
-            Text = "API 密钥：",
-            AutoSize = true,
-            Location = new Point(20, 115),
-            ForeColor = TextSub,
-            Font = new Font("Microsoft YaHei UI", 9F)
-        };
-        subtitlePanel.Controls.Add(lblKey);
-
-        _txtApiKey.SetBounds(120, 112, 650, 24);
-        _txtApiKey.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        _txtApiKey.PasswordChar = '●';
-        _txtApiKey.PlaceholderText = "请输入您的 API Key (如 sk-...)，支持兼容 OpenAI Whisper / Chat 端点";
-        subtitlePanel.Controls.Add(_txtApiKey);
+        // 独立配置入口按钮（配置 API Key 与模型选择，不在主界面杂乱堆叠，且支持永久保存）
+        _btnOpenSettings.Text = "⚙️ 大模型与 API 配置 (独立设置/自动保存)";
+        _btnOpenSettings.SetBounds(22, 75, 290, 32);
+        _btnOpenSettings.BackColor = Color.White;
+        _btnOpenSettings.ForeColor = AccentBlue;
+        _btnOpenSettings.FlatStyle = FlatStyle.Flat;
+        _btnOpenSettings.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254); // #BFDBFE
+        _btnOpenSettings.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+        _btnOpenSettings.Cursor = Cursors.Hand;
+        _btnOpenSettings.Click += (_, _) => OpenSettingsDialog();
+        subtitlePanel.Controls.Add(_btnOpenSettings);
 
         // 实时字幕卡片显示区（在面板内固定预览）
         var subtitleBox = new Panel
         {
-            Location = new Point(20, 148),
-            Size = new Size(750, 100),
+            Location = new Point(20, 115),
+            Size = new Size(750, 75),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             BackColor = Color.FromArgb(241, 245, 249) // #F1F5F9
         };
@@ -396,23 +360,23 @@ public sealed class MainForm : Form
         subtitlePanel.Controls.Add(subtitleBox);
 
         _lblLiveSubtitleZh.Text = "【中文原声】等待麦克风语音输入中...";
-        _lblLiveSubtitleZh.Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
+        _lblLiveSubtitleZh.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
         _lblLiveSubtitleZh.ForeColor = TextMain;
-        _lblLiveSubtitleZh.SetBounds(15, 12, 720, 36);
+        _lblLiveSubtitleZh.SetBounds(15, 8, 720, 28);
         _lblLiveSubtitleZh.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _lblLiveSubtitleZh.AutoEllipsis = true;
         subtitleBox.Controls.Add(_lblLiveSubtitleZh);
 
         _lblLiveSubtitleEn.Text = "【英文译文】Waiting for audio stream speech recognition...";
-        _lblLiveSubtitleEn.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+        _lblLiveSubtitleEn.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
         _lblLiveSubtitleEn.ForeColor = AccentBlue;
-        _lblLiveSubtitleEn.SetBounds(15, 52, 720, 36);
+        _lblLiveSubtitleEn.SetBounds(15, 40, 720, 28);
         _lblLiveSubtitleEn.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _lblLiveSubtitleEn.AutoEllipsis = true;
         subtitleBox.Controls.Add(_lblLiveSubtitleEn);
 
-        _lblSubtitleStatus.Text = "💡 状态：已就绪。输入 API Key 并勾选开启即可体验像歌词一样的实时双语字幕。";
-        _lblSubtitleStatus.SetBounds(22, 256, 745, 22);
+        _lblSubtitleStatus.Text = "💡 状态：已就绪。点击【⚙️ 大模型与 API 配置】配置 Key 并保存即可。";
+        _lblSubtitleStatus.SetBounds(22, 196, 745, 20);
         _lblSubtitleStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _lblSubtitleStatus.Font = new Font("Microsoft YaHei UI", 8.5F);
         _lblSubtitleStatus.ForeColor = TextMuted;
@@ -549,10 +513,12 @@ public sealed class MainForm : Form
         // 字幕配置事件响应
         _chkEnableSubtitle.CheckedChanged += (_, _) =>
         {
+            _config.EnableSubtitle = _chkEnableSubtitle.Checked;
+            ConfigManager.Save(_config);
             _subtitleService.IsEnabled = _chkEnableSubtitle.Checked;
             if (_chkEnableSubtitle.Checked)
             {
-                ApplySubtitleConfig();
+                ApplyConfigToService();
                 if (_chkShowLyricBar.Checked)
                 {
                     _lyricForm.Show();
@@ -570,11 +536,15 @@ public sealed class MainForm : Form
 
         _chkAutoTranslate.CheckedChanged += (_, _) =>
         {
+            _config.AutoTranslate = _chkAutoTranslate.Checked;
+            ConfigManager.Save(_config);
             _subtitleService.AutoTranslate = _chkAutoTranslate.Checked;
         };
 
         _chkShowLyricBar.CheckedChanged += (_, _) =>
         {
+            _config.ShowLyricBar = _chkShowLyricBar.Checked;
+            ConfigManager.Save(_config);
             if (_chkShowLyricBar.Checked && _chkEnableSubtitle.Checked)
             {
                 _lyricForm.Show();
@@ -584,27 +554,6 @@ public sealed class MainForm : Form
                 _lyricForm.Hide();
             }
         };
-
-        _llmPreset.SelectedIndexChanged += (_, _) =>
-        {
-            switch (_llmPreset.SelectedIndex)
-            {
-                case 0: // OpenAI
-                    _txtApiUrl.Text = "https://api.openai.com/v1";
-                    _subtitleService.Model = "whisper-1";
-                    _subtitleService.TranslationModel = "gpt-4o-mini";
-                    break;
-                case 1: // DeepSeek / 国内中转
-                    _txtApiUrl.Text = "https://api.deepseek.com/v1";
-                    _subtitleService.Model = "whisper-1";
-                    _subtitleService.TranslationModel = "deepseek-chat";
-                    break;
-            }
-            ApplySubtitleConfig();
-        };
-
-        _txtApiUrl.TextChanged += (_, _) => ApplySubtitleConfig();
-        _txtApiKey.TextChanged += (_, _) => ApplySubtitleConfig();
 
         // 接收识别到的实时字幕并更新卡片与桌面歌词
         _subtitleService.SubtitleReceived += (zh, en) =>
@@ -630,6 +579,46 @@ public sealed class MainForm : Form
         };
     }
 
+    private void LoadPersistedConfig()
+    {
+        _config = ConfigManager.Load();
+        _chkEnableSubtitle.Checked = _config.EnableSubtitle;
+        _chkAutoTranslate.Checked = _config.AutoTranslate;
+        _chkShowLyricBar.Checked = _config.ShowLyricBar;
+
+        ApplyConfigToService();
+    }
+
+    private void ApplyConfigToService()
+    {
+        _subtitleService.ApiUrl = _config.ApiUrl;
+        _subtitleService.ApiKey = _config.ApiKey;
+        _subtitleService.Model = _config.AsrModel;
+        _subtitleService.TranslationModel = _config.TranslationModel;
+        _subtitleService.AutoTranslate = _config.AutoTranslate;
+        _subtitleService.IsEnabled = _chkEnableSubtitle.Checked;
+        UpdateSubtitleSampleRate();
+    }
+
+    private void OpenSettingsDialog()
+    {
+        using var dlg = new SettingsForm(_config);
+        dlg.ConfigSaved += (savedConfig) =>
+        {
+            _config = savedConfig;
+            _config.EnableSubtitle = _chkEnableSubtitle.Checked;
+            _config.ShowLyricBar = _chkShowLyricBar.Checked;
+            _chkAutoTranslate.Checked = _config.AutoTranslate;
+
+            ConfigManager.Save(_config);
+            ApplyConfigToService();
+
+            _lblSubtitleStatus.Text = $"✅ 配置已生效 (ASR: {_config.AsrModel} | 翻译: {_config.TranslationModel})";
+            _lblSubtitleStatus.ForeColor = AccentGreen;
+        };
+        dlg.ShowDialog(this);
+    }
+
     private void UpdateSubtitleSampleRate()
     {
         int rate = _sampleRate.SelectedIndex switch
@@ -642,14 +631,6 @@ public sealed class MainForm : Form
             _ => 48000
         };
         _subtitleService.SetSampleRate(rate);
-    }
-
-    private void ApplySubtitleConfig()
-    {
-        _subtitleService.ApiUrl = _txtApiUrl.Text.Trim();
-        _subtitleService.ApiKey = _txtApiKey.Text.Trim();
-        _subtitleService.AutoTranslate = _chkAutoTranslate.Checked;
-        UpdateSubtitleSampleRate();
     }
 
     private void UpdateSubtitleUi(string chinese, string english)
