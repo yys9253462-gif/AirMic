@@ -12,6 +12,7 @@ public sealed class LyricSubtitleForm : Form
     private readonly Label _lblEnglish = new();
     private readonly Button _btnClose = new();
     private readonly CheckBox _chkTopMost = new();
+    public event Action? UserClosed;
 
     // 支持无边框拖拽移动
     [DllImport("user32.dll")]
@@ -87,7 +88,11 @@ public sealed class LyricSubtitleForm : Form
         _btnClose.Dock = DockStyle.Right;
         _btnClose.Cursor = Cursors.Hand;
         _btnClose.Font = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold);
-        _btnClose.Click += (_, _) => Hide();
+        _btnClose.Click += (_, _) =>
+        {
+            Hide();
+            UserClosed?.Invoke();
+        };
         dragBar.Controls.Add(_btnClose);
 
         _chkTopMost.Text = "📌 置顶";
@@ -148,9 +153,10 @@ public sealed class LyricSubtitleForm : Form
 
     public void UpdateSubtitle(string chinese, string english)
     {
+        if (IsDisposed) return;
         if (InvokeRequired)
         {
-            BeginInvoke(() => UpdateSubtitle(chinese, english));
+            try { BeginInvoke(() => UpdateSubtitle(chinese, english)); } catch (InvalidOperationException) { }
             return;
         }
 

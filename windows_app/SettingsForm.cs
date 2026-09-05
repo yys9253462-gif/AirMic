@@ -14,6 +14,7 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _chkAutoTranslate = new();
     private readonly Button _btnSave = new();
     private readonly Button _btnCancel = new();
+    private bool _loadingConfig;
 
     private static readonly Color BgColor = Color.FromArgb(248, 250, 252);
     private static readonly Color CardBg = Color.White;
@@ -131,6 +132,7 @@ public sealed class SettingsForm : Form
 
         _cboProvider.SelectedIndexChanged += (_, _) =>
         {
+            if (_loadingConfig) return;
             switch (_cboProvider.SelectedIndex)
             {
                 case 0:
@@ -167,16 +169,33 @@ public sealed class SettingsForm : Form
 
     private void LoadConfig(AppConfig config)
     {
-        _cboProvider.SelectedIndex = Math.Clamp(config.ProviderIndex, 0, _cboProvider.Items.Count - 1);
+        _loadingConfig = true;
         _txtApiUrl.Text = config.ApiUrl;
         _txtApiKey.Text = config.ApiKey;
-        _cboAsrModel.Text = config.AsrModel;
-        _cboTransModel.Text = config.TranslationModel;
+        _cboAsrModel.Text = string.IsNullOrWhiteSpace(config.AsrModel) ? "whisper-1" : config.AsrModel;
+        _cboTransModel.Text = string.IsNullOrWhiteSpace(config.TranslationModel) ? "gpt-4o-mini" : config.TranslationModel;
         _chkAutoTranslate.Checked = config.AutoTranslate;
+        _cboProvider.SelectedIndex = Math.Clamp(config.ProviderIndex, 0, _cboProvider.Items.Count - 1);
+        _loadingConfig = false;
     }
 
     private void OnSave()
     {
+        if (!Uri.TryCreate(_txtApiUrl.Text.Trim(), UriKind.Absolute, out var endpoint) ||
+            (endpoint.Scheme != Uri.UriSchemeHttp && endpoint.Scheme != Uri.UriSchemeHttps))
+        {
+            MessageBox.Show("请输入有效的 API 地址，例如 https://api.openai.com/v1。", "配置有误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _txtApiUrl.Focus();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_txtApiKey.Text))
+        {
+            MessageBox.Show("请输入 API Key。", "配置有误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _txtApiKey.Focus();
+            return;
+        }
+
         string asrModel = _cboAsrModel.Text.Split(' ')[0].Trim();
         string transModel = _cboTransModel.Text.Split(' ')[0].Trim();
 

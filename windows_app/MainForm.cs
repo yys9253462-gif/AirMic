@@ -98,6 +98,10 @@ public sealed class MainForm : Form
         };
 
         BuildUi();
+        _lyricForm.UserClosed += () =>
+        {
+            if (!IsDisposed) _chkShowLyricBar.Checked = false;
+        };
         LoadAudioDevices();
         LoadPersistedConfig();
         HookEvents();
