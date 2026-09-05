@@ -106,7 +106,7 @@ class AudioCaptureService : Service(), TransportListener {
         transport = when (transportType.lowercase()) {
             "bluetooth" -> BluetoothTransport()
             "wifi" -> UdpTransport(serverIp, 8091)
-            "usb" -> UdpTransport("127.0.0.1", 8091) // USB ADB 映射本地端口
+            "usb" -> TcpTransport("127.0.0.1", 8091)
             else -> BluetoothTransport()
         }
         transport?.setListener(this)
@@ -204,7 +204,9 @@ class AudioCaptureService : Service(), TransportListener {
             // 每次仅采集 256 个采样点（在 48kHz 下仅约 5.3 毫秒延迟，极速出流！）
             val chunkSamples = 256
             val audioData = ShortArray(chunkSamples)
-            val headerSize = 8
+            // v2 frame: magic AR, sequence, timestamp, sample rate, PCM.
+            // Keeping a distinct magic preserves compatibility with old AM clients.
+            val headerSize = 12
             val byteBuffer = ByteBuffer.allocate(headerSize + audioData.size * 2).order(ByteOrder.LITTLE_ENDIAN)
 
             while (isRecording) {
@@ -222,9 +224,10 @@ class AudioCaptureService : Service(), TransportListener {
                     // 2. 打包 AirMic 8 字节二进制头
                     byteBuffer.clear()
                     byteBuffer.put(0x41.toByte()) // 'A'
-                    byteBuffer.put(0x4D.toByte()) // 'M'
+                    byteBuffer.put(0x52.toByte()) // 'R' (AirMic v2)
                     byteBuffer.putShort(seqNum++) // 序列号
                     byteBuffer.putInt((System.currentTimeMillis() and 0xFFFFFFFFL).toInt()) // 时间戳
+                    byteBuffer.putInt(sampleRate)
 
                     // 写入 PCM 采样数据
                     for (i in 0 until readSamples) {

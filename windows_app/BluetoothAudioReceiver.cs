@@ -61,12 +61,13 @@ internal sealed class BluetoothAudioReceiver : IDisposable
                 if (length < 8 || length > 262144) throw new InvalidDataException("非法蓝牙音频帧长度");
                 byte[] frame = new byte[length];
                 await ReadExact(stream, frame, token);
-                if (frame[0] != 0x41 || frame[1] != 0x4D) continue;
-                int pcmLength = frame.Length - 8;
-                _buffer?.AddSamples(frame, 8, pcmLength);
-                PcmDataReceived?.Invoke(frame, 8, pcmLength);
+                if (frame[0] != 0x41 || (frame[1] != 0x4D && frame[1] != 0x52)) continue;
+                int headerSize = frame[1] == 0x52 ? 12 : 8;
+                int pcmLength = frame.Length - headerSize;
+                _buffer?.AddSamples(frame, headerSize, pcmLength);
+                PcmDataReceived?.Invoke(frame, headerSize, pcmLength);
                 _packets++;
-                AudioLevel?.Invoke(CalculateDb(frame, 8, pcmLength), _packets);
+                AudioLevel?.Invoke(CalculateDb(frame, headerSize, pcmLength), _packets);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)

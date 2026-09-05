@@ -18,6 +18,9 @@ internal sealed class UdpAudioReceiver : IDisposable
     private WaveOutEvent? _monitorWaveOut;
     private int _sampleRate;
     private long _packets;
+    private ushort _expectedSequence;
+    private readonly SortedDictionary<ushort, byte[]> _reorder = new();
+    private long _lostPackets;
 
     public event Action<int, long>? AudioLevel;
     public event Action<string>? Status;
@@ -35,6 +38,9 @@ internal sealed class UdpAudioReceiver : IDisposable
         Stop();
         _sampleRate = sampleRate;
         _packets = 0;
+        _lostPackets = 0;
+        _expectedSequence = 0;
+        _reorder.Clear();
         _cts = new CancellationTokenSource();
 
         var format = new WaveFormat(sampleRate, 16, 1);
@@ -112,24 +118,38 @@ internal sealed class UdpAudioReceiver : IDisposable
             {
                 var result = await _udp.ReceiveAsync(token);
                 var frame = result.Buffer;
-                // AirMic 协议帧: 0x41 0x4D + 2字节序列号 + 4字节时间戳 + PCM 数据
-                if (frame.Length < 10 || frame[0] != 0x41 || frame[1] != 0x4D) continue;
-
-                int pcmLength = frame.Length - 8;
-                if (pcmLength <= 0) continue;
-
-                // 注入主播放管线
-                _mainBuffer?.AddSamples(frame, 8, pcmLength);
-
-                // 同步注入耳机/扬声器监听管线 (测试用)
-                _monitorBuffer?.AddSamples(frame, 8, pcmLength);
-
-                // 分发 PCM 音频原始采样 (供 AI 大模型字幕与转录使用)
-                PcmDataReceived?.Invoke(frame, 8, pcmLength);
-
-                _packets++;
-                int db = CalculateDb(frame, 8, pcmLength);
-                AudioLevel?.Invoke(db, _packets);
+                if (frame.Length < 10 || frame[0] != 0x41 || (frame[1] != 0x4D && frame[1] != 0x52)) continue;
+                ushort sequence = BitConverter.ToUInt16(frame, 2);
+                int headerSize = frame[1] == 0x52 ? 12 : 8;
+                if (frame.Length <= headerSize) continue;
+                if (frame[1] == 0x52)
+                {
+                    int negotiatedRate = BitConverter.ToInt32(frame, 8);
+                    if (negotiatedRate >= 8000 && negotiatedRate <= 192000 && negotiatedRate != _sampleRate)
+                    {
+                        Status?.Invoke($"已协商手机采样率 {negotiatedRate} Hz，请保持两端采样率一致");
+                    }
+                }
+                var payload = new byte[frame.Length - headerSize];
+                Buffer.BlockCopy(frame, headerSize, payload, 0, payload.Length);
+                lock (_reorder) _reorder[sequence] = payload;
+                while (true)
+                {
+                    byte[]? ready = null;
+                    lock (_reorder)
+                    {
+                        if (_reorder.TryGetValue(_expectedSequence, out ready)) _reorder.Remove(_expectedSequence);
+                        else if (_reorder.Count > 8)
+                        {
+                            _lostPackets++;
+                            _expectedSequence++;
+                            continue;
+                        }
+                    }
+                    if (ready == null) break;
+                    ProcessPayload(ready);
+                    _expectedSequence++;
+                }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -138,6 +158,16 @@ internal sealed class UdpAudioReceiver : IDisposable
                 await Task.Delay(200, token).ConfigureAwait(false);
             }
         }
+    }
+
+    private void ProcessPayload(byte[] payload)
+    {
+        _mainBuffer?.AddSamples(payload, 0, payload.Length);
+        _monitorBuffer?.AddSamples(payload, 0, payload.Length);
+        PcmDataReceived?.Invoke(payload, 0, payload.Length);
+        _packets++;
+        int db = CalculateDb(payload, 0, payload.Length);
+        AudioLevel?.Invoke(db, _packets);
     }
 
     private static int CalculateDb(byte[] data, int offset, int count)
@@ -156,6 +186,7 @@ internal sealed class UdpAudioReceiver : IDisposable
     public void Stop()
     {
         _cts?.Cancel();
+        lock (_reorder) _reorder.Clear();
         _udp?.Dispose();
         _udp = null;
 

@@ -19,12 +19,14 @@ public sealed class MainForm : Form
 {
     private readonly UdpAudioReceiver _udp = new();
     private readonly BluetoothAudioReceiver _bluetooth = new();
+    private readonly TcpAudioReceiver _tcpUsb = new();
 
     // 双重配对机制：UDP 广播 + 原生高兼容 TCP/HTTP 握手服务 (端口 8092 UDP / 8090 TCP)
     private UdpClient? _pairingUdp;
     private TcpListener? _tcpPairingServer;
     private CancellationTokenSource? _pairCts;
     private readonly System.Windows.Forms.Timer _beaconTimer = new();
+    private bool _beaconConfigured;
 
     private readonly ComboBox _mode = new();
     private readonly ComboBox _outputDevice = new();
@@ -90,6 +92,7 @@ public sealed class MainForm : Form
             _pairingUdp?.Dispose();
             _udp.Dispose();
             _bluetooth.Dispose();
+            _tcpUsb.Dispose();
             _subtitleService.Dispose();
             _lyricForm.Dispose();
         };
@@ -505,10 +508,12 @@ public sealed class MainForm : Form
 
         _udp.AudioLevel += UpdateMeter;
         _bluetooth.AudioLevel += UpdateMeter;
+        _tcpUsb.AudioLevel += UpdateMeter;
 
         // 订阅原始音频 PCM 流给大模型字幕服务
         _udp.PcmDataReceived += (buf, offset, len) => _subtitleService.FeedPcmData(buf, offset, len);
         _bluetooth.PcmDataReceived += (buf, offset, len) => _subtitleService.FeedPcmData(buf, offset, len);
+        _tcpUsb.PcmDataReceived += (buf, offset, len) => _subtitleService.FeedPcmData(buf, offset, len);
 
         // 字幕配置事件响应
         _chkEnableSubtitle.CheckedChanged += (_, _) =>
@@ -671,18 +676,22 @@ public sealed class MainForm : Form
             // 每 500ms 发送一次包含真实 Wi-Fi IP 的广播
             _beaconTimer.Stop();
             _beaconTimer.Interval = 500;
-            _beaconTimer.Tick += (_, _) =>
+            if (!_beaconConfigured)
             {
-                try
+                _beaconConfigured = true;
+                _beaconTimer.Tick += (_, _) =>
                 {
-                    string realIp = GetRealWiFiIp();
-                    string pcName = Environment.MachineName;
-                    string beacon = $"AirMicBeacon:{realIp}:8091:{pcName}";
-                    byte[] bytes = Encoding.UTF8.GetBytes(beacon);
-                    _pairingUdp.Send(bytes, bytes.Length, new IPEndPoint(IPAddress.Broadcast, 8092));
-                }
-                catch { }
-            };
+                    try
+                    {
+                        string realIp = GetRealWiFiIp();
+                        string pcName = Environment.MachineName;
+                        string beacon = $"AirMicBeacon:{realIp}:8091:{pcName}";
+                        byte[] bytes = Encoding.UTF8.GetBytes(beacon);
+                        _pairingUdp?.Send(bytes, bytes.Length, new IPEndPoint(IPAddress.Broadcast, 8092));
+                    }
+                    catch { }
+                };
+            }
             _beaconTimer.Start();
 
             // 2. 启动基于原生 Socket/TcpListener 的 HTTP 配对探测服务 (端口 8090)
@@ -832,6 +841,7 @@ public sealed class MainForm : Form
         try
         {
             _udp.Start(8091, rate, output.Index, monitorDev);
+            _tcpUsb.Start(8091, rate, output.Index);
             _isAudioRunning = true;
         }
         catch (Exception ex)
@@ -845,6 +855,7 @@ public sealed class MainForm : Form
         _isAudioRunning = false;
         _udp.Stop();
         _bluetooth.Stop();
+        _tcpUsb.Stop();
         SetPairStatus(false, "已断开音频串流 (配对服务保持待命，随时可重连)");
         UpdateMeter(-60, 0);
     }
