@@ -95,7 +95,12 @@ public sealed class SettingsForm : Form
             "deepseek-chat (DeepSeek V3)",
             "deepseek-reasoner (DeepSeek R1)",
             "qwen-plus (通义千问)",
-            "claude-3-5-sonnet"
+            "claude-3-5-sonnet",
+            "gemini-2.5-flash (Gemini 极速)",
+            "gemini-2.5-pro (Gemini 高质量)",
+            "gemini-2.0-flash (Gemini 稳定版)",
+            "gemini-2.0-flash-lite (Gemini 低延迟)",
+            "gemini-3-flash-preview (第三方接口提供时可用)"
         });
         y += 46;
 
