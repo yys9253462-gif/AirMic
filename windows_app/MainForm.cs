@@ -3,7 +3,6 @@ using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -63,12 +62,14 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = "AirMic - 手机无线麦克风电脑端 (v1.0.0 Pro)";
-        Width = 840;
-        Height = 690;
-        MinimumSize = new Size(800, 650);
+        // 允许用户自由缩放窗口，设置合理初始尺寸与最小边界
+        ClientSize = new Size(860, 720);
+        MinimumSize = new Size(760, 640);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = BgColor;
-        Font = new Font("Microsoft YaHei UI", 9.5F);
+        Font = new Font("Microsoft YaHei UI", 9F);
+        // 关键：基于 Dpi 自动缩放，并在代码中用锚定布局保证任何分辨率与缩放比例下不溢出、不重叠
+        AutoScaleMode = AutoScaleMode.Dpi;
 
         FormClosing += (_, _) => {
             _beaconTimer.Stop();
@@ -90,21 +91,32 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
-        // 顶部精美 Header 区域
+        // 外部全局滚动容器，保障极端分辨率或小窗口时也能轻松完整浏览
+        var scrollContainer = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = BgColor,
+            Padding = new Padding(25, 18, 25, 25)
+        };
+        Controls.Add(scrollContainer);
+
+        // 顶部品牌横幅 (自适应宽度)
         var headerPanel = new Panel
         {
-            Location = new Point(35, 18),
-            Size = new Size(750, 60),
+            Dock = DockStyle.Top,
+            Height = 70,
             BackColor = Color.Transparent
         };
-        Controls.Add(headerPanel);
+        scrollContainer.Controls.Add(headerPanel);
 
         var iconLabel = new Label
         {
             Text = "🎙️",
-            Font = new Font("Segoe UI Emoji", 24F),
-            Location = new Point(0, 4),
-            AutoSize = true
+            Font = new Font("Segoe UI Emoji", 26F),
+            Location = new Point(0, 0),
+            Size = new Size(50, 56),
+            TextAlign = ContentAlignment.MiddleCenter
         };
         headerPanel.Controls.Add(iconLabel);
 
@@ -114,7 +126,7 @@ public sealed class MainForm : Form
             Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
             ForeColor = TextMain,
             AutoSize = true,
-            Location = new Point(48, 2)
+            Location = new Point(54, 4)
         };
         var subtitle = new Label
         {
@@ -122,75 +134,70 @@ public sealed class MainForm : Form
             ForeColor = TextMuted,
             Font = new Font("Microsoft YaHei UI", 9F),
             AutoSize = true,
-            Location = new Point(50, 34)
+            Location = new Point(56, 36)
         };
         headerPanel.Controls.Add(title);
         headerPanel.Controls.Add(subtitle);
 
         // 1. 配对状态大卡片
-        SetupCardPanel(_pairCard, 35, 85, 750, 95);
-        _pairCard.BackColor = Color.FromArgb(254, 252, 232); // 柔和琥珀黄预警底色
-        Controls.Add(_pairCard);
+        SetupCardPanel(_pairCard, 0, 80, 800, 100);
+        _pairCard.BackColor = Color.FromArgb(254, 252, 232); // 柔和琥珀黄
+        _pairCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        scrollContainer.Controls.Add(_pairCard);
 
         var pairTitle = new Label 
         { 
-            Text = "双端互通状态", 
+            Text = "双端互通状态：", 
             AutoSize = true, 
-            Location = new Point(22, 16), 
+            Location = new Point(20, 18), 
             ForeColor = TextSub, 
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold) 
+            Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold) 
         };
         _pairCard.Controls.Add(pairTitle);
 
         _pairStatusBadge.Text = "⏳ 等待手机配对中 (请在手机端打开 AirMic)";
         _pairStatusBadge.AutoSize = true;
-        _pairStatusBadge.Location = new Point(125, 14);
+        _pairStatusBadge.Location = new Point(130, 16);
         _pairStatusBadge.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
         _pairStatusBadge.ForeColor = AccentYellow;
         _pairCard.Controls.Add(_pairStatusBadge);
 
         _pairDetail.Text = "自动配对服务运行中... 手机打开 App 后无需输入 IP，秒级自动探测连接。";
-        _pairDetail.AutoSize = true;
-        _pairDetail.Location = new Point(22, 50);
+        _pairDetail.SetBounds(22, 52, 740, 36);
+        _pairDetail.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _pairDetail.Font = new Font("Microsoft YaHei UI", 9F);
         _pairDetail.ForeColor = TextSub;
         _pairCard.Controls.Add(_pairDetail);
 
-        // 2. 音频配置卡片
+        // 2. 音频配置卡片 (加大高度至 230，彻底杜绝采样率文字截断)
         var configPanel = new Panel();
-        SetupCardPanel(configPanel, 35, 195, 750, 185);
-        Controls.Add(configPanel);
+        SetupCardPanel(configPanel, 0, 195, 800, 235);
+        configPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        scrollContainer.Controls.Add(configPanel);
 
         var configHeader = new Label
         {
             Text = "⚙️ 核心音频与设备配置",
             Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
             ForeColor = TextMain,
-            Location = new Point(22, 14),
+            Location = new Point(20, 15),
             AutoSize = true
         };
         configPanel.Controls.Add(configHeader);
 
-        int y = 48;
-        AddStyledRow(configPanel, "连接传输方式", _mode, y, 420);
+        int y = 50;
+        AddStyledRow(configPanel, "连接传输方式", _mode, y);
         _mode.Items.AddRange(new object[] { "Wi-Fi 局域网 (默认推荐 / 零配置全自动配对)", "蓝牙 RFCOMM (SPP)" });
         _mode.SelectedIndex = 0;
-        y += 42;
+        y += 44;
 
-        AddStyledRow(configPanel, "主音频输出设备", _outputDevice, y, 420);
-        y += 42;
+        AddStyledRow(configPanel, "主音频输出设备", _outputDevice, y);
+        y += 44;
 
-        AddStyledRow(configPanel, "实时试听监听", _monitorDevice, y, 320);
-        _chkMonitor.Text = "启用耳机/扬声器耳返";
-        _chkMonitor.AutoSize = true;
-        _chkMonitor.SetBounds(470, y + 4, 180, 26);
-        _chkMonitor.ForeColor = AccentBlue;
-        _chkMonitor.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
-        _chkMonitor.Cursor = Cursors.Hand;
-        configPanel.Controls.Add(_chkMonitor);
-        y += 42;
+        AddStyledRow(configPanel, "实时试听监听", _monitorDevice, y, hasMonitorCheck: true);
+        y += 44;
 
-        AddStyledRow(configPanel, "音频采样规格", _sampleRate, y, 420);
+        AddStyledRow(configPanel, "音频采样规格", _sampleRate, y);
         _sampleRate.Items.AddRange(new object[] { 
             "192000 Hz (192kHz 旗舰发烧级)", 
             "96000 Hz (96kHz 专业录音棚级)", 
@@ -201,21 +208,32 @@ public sealed class MainForm : Form
         _sampleRate.SelectedIndex = 2;
 
         // 3. 现代化操作按钮栏
-        StylePrimaryButton(_connect, "⚡ 重置配对与接收", 35, 395, 160, 42, AccentBlue);
-        StyleOutlineButton(_disconnect, "断开连接", 205, 395, 110, 42);
-        StylePrimaryButton(_testSpeaker, "🔊 麦克风自检回放 (测试)", 325, 395, 210, 42, AccentGreen);
+        var btnPanel = new Panel
+        {
+            Location = new Point(0, 442),
+            Size = new Size(800, 50),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            BackColor = Color.Transparent
+        };
+        scrollContainer.Controls.Add(btnPanel);
 
-        Controls.Add(_connect);
-        Controls.Add(_disconnect);
-        Controls.Add(_testSpeaker);
+        StylePrimaryButton(_connect, "⚡ 重置配对与接收", 0, 2, 175, 42, AccentBlue);
+        StyleOutlineButton(_disconnect, "断开连接", 188, 2, 115, 42);
+        StylePrimaryButton(_testSpeaker, "🔊 麦克风自检回放 (测试)", 315, 2, 225, 42, AccentGreen);
+
+        btnPanel.Controls.Add(_connect);
+        btnPanel.Controls.Add(_disconnect);
+        btnPanel.Controls.Add(_testSpeaker);
 
         // 4. 实时动态电平与诊断卡片
         var statPanel = new Panel();
-        SetupCardPanel(statPanel, 35, 452, 750, 140);
-        Controls.Add(statPanel);
+        SetupCardPanel(statPanel, 0, 502, 800, 150);
+        statPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        scrollContainer.Controls.Add(statPanel);
 
-        _localAddress.Text = "📍 本机局域网 Wi-Fi IP：" + GetRealWiFiIp() + "  |  音频传输端口: 8091  |  配对端口: 8090/8092";
-        _localAddress.SetBounds(22, 14, 700, 24);
+        _localAddress.Text = "📍 本机局域网 Wi-Fi IP：" + GetRealWiFiIp() + "  |  音频传输端口: 8091  |  配对握手: 8090/8092";
+        _localAddress.SetBounds(20, 16, 750, 24);
+        _localAddress.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _localAddress.Font = new Font("Microsoft YaHei UI", 9F);
         _localAddress.ForeColor = TextSub;
         statPanel.Controls.Add(_localAddress);
@@ -224,31 +242,34 @@ public sealed class MainForm : Form
         { 
             Text = "麦克风实时动态电平：", 
             AutoSize = true, 
-            Location = new Point(22, 48), 
+            Location = new Point(20, 52), 
             ForeColor = TextMain,
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
+            Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold)
         };
         statPanel.Controls.Add(meterLabel);
 
         _db.Text = "-60 dB";
-        _db.SetBounds(165, 48, 70, 20);
-        _db.Font = new Font("Consolas", 10F, FontStyle.Bold);
+        _db.SetBounds(165, 52, 65, 20);
+        _db.Font = new Font("Consolas", 10.5F, FontStyle.Bold);
         _db.ForeColor = TextMuted;
         statPanel.Controls.Add(_db);
 
-        _meter.SetBounds(240, 46, 360, 22);
+        _meter.SetBounds(235, 50, 410, 24);
+        _meter.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _meter.Maximum = 60;
         _meter.Value = 0;
         statPanel.Controls.Add(_meter);
 
         _packets.Text = "已收数据包：0";
-        _packets.SetBounds(615, 48, 120, 20);
+        _packets.SetBounds(660, 52, 120, 20);
+        _packets.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _packets.Font = new Font("Consolas", 9F);
         _packets.ForeColor = TextMuted;
         statPanel.Controls.Add(_packets);
 
         _testResult.Text = "💡 测试指引：配对成功后对着手机讲话，点击【麦克风自检回放】即可从耳机直接听取回放与时延表现。";
-        _testResult.SetBounds(22, 90, 700, 28);
+        _testResult.SetBounds(20, 95, 750, 38);
+        _testResult.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _testResult.Font = new Font("Microsoft YaHei UI", 9F);
         _testResult.ForeColor = TextMuted;
         statPanel.Controls.Add(_testResult);
@@ -267,23 +288,42 @@ public sealed class MainForm : Form
         };
     }
 
-    private static void AddStyledRow(Control parent, string caption, Control control, int y, int controlWidth)
+    private void AddStyledRow(Control parent, string caption, ComboBox control, int y, bool hasMonitorCheck = false)
     {
         var label = new Label
         {
             Text = caption,
             AutoSize = true,
-            Location = new Point(22, y + 4),
+            Location = new Point(20, y + 4),
             ForeColor = TextSub,
             Font = new Font("Microsoft YaHei UI", 9.5F)
         };
-        control.SetBounds(140, y, controlWidth, 28);
-        if (control is ComboBox cb)
-        {
-            cb.DropDownStyle = ComboBoxStyle.DropDownList;
-            cb.FlatStyle = FlatStyle.System;
-        }
         parent.Controls.Add(label);
+
+        if (hasMonitorCheck)
+        {
+            // 带复选框的特殊行：下拉框宽度留出空间给复选框
+            control.SetBounds(135, y, 420, 28);
+            control.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+            _chkMonitor.Text = "启用耳机/扬声器耳返";
+            _chkMonitor.AutoSize = true;
+            _chkMonitor.SetBounds(570, y + 3, 190, 26);
+            _chkMonitor.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _chkMonitor.ForeColor = AccentBlue;
+            _chkMonitor.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            _chkMonitor.Cursor = Cursors.Hand;
+            parent.Controls.Add(_chkMonitor);
+        }
+        else
+        {
+            // 常规行：下拉框自适应铺满卡片宽度
+            control.SetBounds(135, y, 620, 28);
+            control.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        }
+
+        control.DropDownStyle = ComboBoxStyle.DropDownList;
+        control.FlatStyle = FlatStyle.System;
         parent.Controls.Add(control);
     }
 
