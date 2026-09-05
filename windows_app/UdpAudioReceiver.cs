@@ -21,6 +21,7 @@ internal sealed class UdpAudioReceiver : IDisposable
 
     public event Action<int, long>? AudioLevel;
     public event Action<string>? Status;
+    public event Action<byte[], int, int>? PcmDataReceived;
 
     public IReadOnlyList<WaveOutCapabilities> GetOutputDevices()
     {
@@ -122,6 +123,9 @@ internal sealed class UdpAudioReceiver : IDisposable
 
                 // 同步注入耳机/扬声器监听管线 (测试用)
                 _monitorBuffer?.AddSamples(frame, 8, pcmLength);
+
+                // 分发 PCM 音频原始采样 (供 AI 大模型字幕与转录使用)
+                PcmDataReceived?.Invoke(frame, 8, pcmLength);
 
                 _packets++;
                 int db = CalculateDb(frame, 8, pcmLength);

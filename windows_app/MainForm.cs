@@ -44,6 +44,19 @@ public sealed class MainForm : Form
     private readonly Label _testResult = new();
     private readonly ProgressBar _meter = new();
 
+    // AI 实时语音字幕组件
+    private readonly LlmSubtitleService _subtitleService = new();
+    private readonly LyricSubtitleForm _lyricForm = new();
+    private readonly CheckBox _chkEnableSubtitle = new();
+    private readonly CheckBox _chkAutoTranslate = new();
+    private readonly CheckBox _chkShowLyricBar = new();
+    private readonly ComboBox _llmPreset = new();
+    private readonly TextBox _txtApiUrl = new();
+    private readonly TextBox _txtApiKey = new();
+    private readonly Label _lblLiveSubtitleZh = new();
+    private readonly Label _lblLiveSubtitleEn = new();
+    private readonly Label _lblSubtitleStatus = new();
+
     private DateTime _lastSoundTime = DateTime.MinValue;
     private bool _isAudioRunning = false;
 
@@ -63,8 +76,8 @@ public sealed class MainForm : Form
     {
         Text = "AirMic - 手机无线麦克风电脑端 (v1.0.0 Pro)";
         // 允许用户自由缩放窗口，设置合理初始尺寸与最小边界
-        ClientSize = new Size(860, 720);
-        MinimumSize = new Size(760, 640);
+        ClientSize = new Size(880, 820);
+        MinimumSize = new Size(780, 680);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = BgColor;
         Font = new Font("Microsoft YaHei UI", 9F);
@@ -78,6 +91,8 @@ public sealed class MainForm : Form
             _pairingUdp?.Dispose();
             _udp.Dispose();
             _bluetooth.Dispose();
+            _subtitleService.Dispose();
+            _lyricForm.Dispose();
         };
 
         BuildUi();
@@ -273,6 +288,135 @@ public sealed class MainForm : Form
         _testResult.Font = new Font("Microsoft YaHei UI", 9F);
         _testResult.ForeColor = TextMuted;
         statPanel.Controls.Add(_testResult);
+
+        // 5. 大模型实时语音字幕与自动翻译卡片
+        var subtitlePanel = new Panel();
+        SetupCardPanel(subtitlePanel, 0, 665, 800, 290);
+        subtitlePanel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        scrollContainer.Controls.Add(subtitlePanel);
+
+        var subHeader = new Label
+        {
+            Text = "🤖 大模型实时语音识别字幕与自动英文翻译 (歌词固定悬浮)",
+            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
+            ForeColor = TextMain,
+            Location = new Point(20, 14),
+            AutoSize = true
+        };
+        subtitlePanel.Controls.Add(subHeader);
+
+        _chkEnableSubtitle.Text = "开启实时 AI 语音识别字幕";
+        _chkEnableSubtitle.AutoSize = true;
+        _chkEnableSubtitle.Location = new Point(22, 45);
+        _chkEnableSubtitle.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+        _chkEnableSubtitle.ForeColor = AccentBlue;
+        _chkEnableSubtitle.Cursor = Cursors.Hand;
+        subtitlePanel.Controls.Add(_chkEnableSubtitle);
+
+        _chkAutoTranslate.Text = "自动实时翻译为英文";
+        _chkAutoTranslate.Checked = true;
+        _chkAutoTranslate.AutoSize = true;
+        _chkAutoTranslate.Location = new Point(240, 45);
+        _chkAutoTranslate.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+        _chkAutoTranslate.ForeColor = AccentGreen;
+        _chkAutoTranslate.Cursor = Cursors.Hand;
+        subtitlePanel.Controls.Add(_chkAutoTranslate);
+
+        _chkShowLyricBar.Text = "悬浮固定桌面歌词条 (像音乐播放器一样置顶)";
+        _chkShowLyricBar.Checked = true;
+        _chkShowLyricBar.AutoSize = true;
+        _chkShowLyricBar.Location = new Point(440, 45);
+        _chkShowLyricBar.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+        _chkShowLyricBar.ForeColor = AccentYellow;
+        _chkShowLyricBar.Cursor = Cursors.Hand;
+        subtitlePanel.Controls.Add(_chkShowLyricBar);
+
+        // API 服务配置行
+        var lblApiProvider = new Label
+        {
+            Text = "大模型服务商：",
+            AutoSize = true,
+            Location = new Point(20, 80),
+            ForeColor = TextSub,
+            Font = new Font("Microsoft YaHei UI", 9F)
+        };
+        subtitlePanel.Controls.Add(lblApiProvider);
+
+        _llmPreset.SetBounds(120, 76, 200, 26);
+        _llmPreset.DropDownStyle = ComboBoxStyle.DropDownList;
+        _llmPreset.Items.AddRange(new object[] { "OpenAI 官方", "DeepSeek / 本地中转", "自定义 API 端点" });
+        _llmPreset.SelectedIndex = 0;
+        subtitlePanel.Controls.Add(_llmPreset);
+
+        var lblApiUrl = new Label
+        {
+            Text = "API 地址：",
+            AutoSize = true,
+            Location = new Point(335, 80),
+            ForeColor = TextSub,
+            Font = new Font("Microsoft YaHei UI", 9F)
+        };
+        subtitlePanel.Controls.Add(lblApiUrl);
+
+        _txtApiUrl.SetBounds(405, 76, 365, 24);
+        _txtApiUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _txtApiUrl.Text = "https://api.openai.com/v1";
+        subtitlePanel.Controls.Add(_txtApiUrl);
+
+        var lblKey = new Label
+        {
+            Text = "API 密钥：",
+            AutoSize = true,
+            Location = new Point(20, 115),
+            ForeColor = TextSub,
+            Font = new Font("Microsoft YaHei UI", 9F)
+        };
+        subtitlePanel.Controls.Add(lblKey);
+
+        _txtApiKey.SetBounds(120, 112, 650, 24);
+        _txtApiKey.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _txtApiKey.PasswordChar = '●';
+        _txtApiKey.PlaceholderText = "请输入您的 API Key (如 sk-...)，支持兼容 OpenAI Whisper / Chat 端点";
+        subtitlePanel.Controls.Add(_txtApiKey);
+
+        // 实时字幕卡片显示区（在面板内固定预览）
+        var subtitleBox = new Panel
+        {
+            Location = new Point(20, 148),
+            Size = new Size(750, 100),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            BackColor = Color.FromArgb(241, 245, 249) // #F1F5F9
+        };
+        subtitleBox.Paint += (s, e) =>
+        {
+            var p = (Panel)s!;
+            using var pen = new Pen(Color.FromArgb(203, 213, 225), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
+        };
+        subtitlePanel.Controls.Add(subtitleBox);
+
+        _lblLiveSubtitleZh.Text = "【中文原声】等待麦克风语音输入中...";
+        _lblLiveSubtitleZh.Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
+        _lblLiveSubtitleZh.ForeColor = TextMain;
+        _lblLiveSubtitleZh.SetBounds(15, 12, 720, 36);
+        _lblLiveSubtitleZh.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _lblLiveSubtitleZh.AutoEllipsis = true;
+        subtitleBox.Controls.Add(_lblLiveSubtitleZh);
+
+        _lblLiveSubtitleEn.Text = "【英文译文】Waiting for audio stream speech recognition...";
+        _lblLiveSubtitleEn.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+        _lblLiveSubtitleEn.ForeColor = AccentBlue;
+        _lblLiveSubtitleEn.SetBounds(15, 52, 720, 36);
+        _lblLiveSubtitleEn.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _lblLiveSubtitleEn.AutoEllipsis = true;
+        subtitleBox.Controls.Add(_lblLiveSubtitleEn);
+
+        _lblSubtitleStatus.Text = "💡 状态：已就绪。输入 API Key 并勾选开启即可体验像歌词一样的实时双语字幕。";
+        _lblSubtitleStatus.SetBounds(22, 256, 745, 22);
+        _lblSubtitleStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        _lblSubtitleStatus.Font = new Font("Microsoft YaHei UI", 8.5F);
+        _lblSubtitleStatus.ForeColor = TextMuted;
+        subtitlePanel.Controls.Add(_lblSubtitleStatus);
     }
 
     private static void SetupCardPanel(Panel panel, int x, int y, int width, int height)
@@ -390,10 +534,141 @@ public sealed class MainForm : Form
         // 当用户修改配置（输出设备、试听设备、采样率）时，自动热重载音频引擎，无需重启软件
         _outputDevice.SelectedIndexChanged += (_, _) => { if (_isAudioRunning) StartAudioEngine(); };
         _monitorDevice.SelectedIndexChanged += (_, _) => { if (_chkMonitor.Checked) ToggleMonitoring(); };
-        _sampleRate.SelectedIndexChanged += (_, _) => { if (_isAudioRunning) StartAudioEngine(); };
+        _sampleRate.SelectedIndexChanged += (_, _) => { 
+            UpdateSubtitleSampleRate();
+            if (_isAudioRunning) StartAudioEngine(); 
+        };
 
         _udp.AudioLevel += UpdateMeter;
         _bluetooth.AudioLevel += UpdateMeter;
+
+        // 订阅原始音频 PCM 流给大模型字幕服务
+        _udp.PcmDataReceived += (buf, offset, len) => _subtitleService.FeedPcmData(buf, offset, len);
+        _bluetooth.PcmDataReceived += (buf, offset, len) => _subtitleService.FeedPcmData(buf, offset, len);
+
+        // 字幕配置事件响应
+        _chkEnableSubtitle.CheckedChanged += (_, _) =>
+        {
+            _subtitleService.IsEnabled = _chkEnableSubtitle.Checked;
+            if (_chkEnableSubtitle.Checked)
+            {
+                ApplySubtitleConfig();
+                if (_chkShowLyricBar.Checked)
+                {
+                    _lyricForm.Show();
+                }
+                _lblSubtitleStatus.Text = "✨ AI 字幕已启动，对着手机说话将自动识别并滚动显示。";
+                _lblSubtitleStatus.ForeColor = AccentGreen;
+            }
+            else
+            {
+                _lyricForm.Hide();
+                _lblSubtitleStatus.Text = "💡 AI 字幕已暂停。";
+                _lblSubtitleStatus.ForeColor = TextMuted;
+            }
+        };
+
+        _chkAutoTranslate.CheckedChanged += (_, _) =>
+        {
+            _subtitleService.AutoTranslate = _chkAutoTranslate.Checked;
+        };
+
+        _chkShowLyricBar.CheckedChanged += (_, _) =>
+        {
+            if (_chkShowLyricBar.Checked && _chkEnableSubtitle.Checked)
+            {
+                _lyricForm.Show();
+            }
+            else
+            {
+                _lyricForm.Hide();
+            }
+        };
+
+        _llmPreset.SelectedIndexChanged += (_, _) =>
+        {
+            switch (_llmPreset.SelectedIndex)
+            {
+                case 0: // OpenAI
+                    _txtApiUrl.Text = "https://api.openai.com/v1";
+                    _subtitleService.Model = "whisper-1";
+                    _subtitleService.TranslationModel = "gpt-4o-mini";
+                    break;
+                case 1: // DeepSeek / 国内中转
+                    _txtApiUrl.Text = "https://api.deepseek.com/v1";
+                    _subtitleService.Model = "whisper-1";
+                    _subtitleService.TranslationModel = "deepseek-chat";
+                    break;
+            }
+            ApplySubtitleConfig();
+        };
+
+        _txtApiUrl.TextChanged += (_, _) => ApplySubtitleConfig();
+        _txtApiKey.TextChanged += (_, _) => ApplySubtitleConfig();
+
+        // 接收识别到的实时字幕并更新卡片与桌面歌词
+        _subtitleService.SubtitleReceived += (zh, en) =>
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => UpdateSubtitleUi(zh, en));
+                return;
+            }
+            UpdateSubtitleUi(zh, en);
+        };
+
+        _subtitleService.StatusChanged += (status) =>
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => {
+                    _lblSubtitleStatus.Text = status;
+                });
+                return;
+            }
+            _lblSubtitleStatus.Text = status;
+        };
+    }
+
+    private void UpdateSubtitleSampleRate()
+    {
+        int rate = _sampleRate.SelectedIndex switch
+        {
+            0 => 192000,
+            1 => 96000,
+            2 => 48000,
+            3 => 44100,
+            4 => 16000,
+            _ => 48000
+        };
+        _subtitleService.SetSampleRate(rate);
+    }
+
+    private void ApplySubtitleConfig()
+    {
+        _subtitleService.ApiUrl = _txtApiUrl.Text.Trim();
+        _subtitleService.ApiKey = _txtApiKey.Text.Trim();
+        _subtitleService.AutoTranslate = _chkAutoTranslate.Checked;
+        UpdateSubtitleSampleRate();
+    }
+
+    private void UpdateSubtitleUi(string chinese, string english)
+    {
+        if (!string.IsNullOrWhiteSpace(chinese))
+        {
+            _lblLiveSubtitleZh.Text = "【中文原声】" + chinese;
+        }
+        if (!string.IsNullOrWhiteSpace(english))
+        {
+            _lblLiveSubtitleEn.Text = "【英文翻译】" + english;
+        }
+        else if (!_chkAutoTranslate.Checked)
+        {
+            _lblLiveSubtitleEn.Text = "【英文翻译】(未开启自动翻译)";
+        }
+
+        // 同步推送给歌词悬浮条
+        _lyricForm.UpdateSubtitle(chinese, english);
     }
 
     // 启动多重配对协议：UDP 广播 + 原生 TCP/HTTP 零配置快速握手接口

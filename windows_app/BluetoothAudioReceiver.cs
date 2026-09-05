@@ -21,6 +21,7 @@ internal sealed class BluetoothAudioReceiver : IDisposable
 
     public event Action<int, long>? AudioLevel;
     public event Action<string>? Status;
+    public event Action<byte[], int, int>? PcmDataReceived;
 
     public async Task<IReadOnlyList<BluetoothDeviceInfo>> DiscoverAsync()
     {
@@ -63,6 +64,7 @@ internal sealed class BluetoothAudioReceiver : IDisposable
                 if (frame[0] != 0x41 || frame[1] != 0x4D) continue;
                 int pcmLength = frame.Length - 8;
                 _buffer?.AddSamples(frame, 8, pcmLength);
+                PcmDataReceived?.Invoke(frame, 8, pcmLength);
                 _packets++;
                 AudioLevel?.Invoke(CalculateDb(frame, 8, pcmLength), _packets);
             }
